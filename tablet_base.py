@@ -11,7 +11,7 @@ class Test:
     def __init__(self):
         window = self.window = QLabel()
         window.setGeometry(0, 0, *SIZE)
-        window.setWindowTitle('Draw text')
+        window.setWindowTitle("Tablet Scribling")
         window.paintEvent = self.paintEvent
         window.tabletEvent = self.tabletEvent
         window.keyPressEvent = self.keyPressEvent
