@@ -1,9 +1,49 @@
-import os
+import os, sys
+
+import threading, time
+
 
 import bpy
 from bpy.props import StringProperty, PointerProperty, BoolProperty
 
 from bpy.types import Panel, Operator, PropertyGroup
+
+
+def autograph_path():
+    """Enable 3rd party Python modules installed in an
+    active Virtualenv when Python is run.
+    (Blender ignores the virtualenv, and uses a
+    Python binary hardcoded in the build. This works
+    if the virtualenv's Python is the same as blenders')
+    """
+
+    import sys, os
+    from pathlib import Path
+
+    pyversion_path = f"python{sys.version_info.major}.{sys.version_info.minor}"
+
+    for pathcomp in os.environ["PATH"].split(os.pathsep)[::-1]:
+        p = Path(pathcomp)
+        if p.name != "bin" not in pathcomp.lower():
+            continue
+        lib_path = p.parent / "lib" / pyversion_path / "site-packages"
+        if not lib_path.exists():
+            continue
+        if str(lib_path) in sys.path:
+            continue
+        sys.path.insert(0, str(lib_path))
+
+        print(f"Autograph extension: prepended {lib_path!r} to PYTHONPATH")
+
+
+autograph_path()
+
+try:
+    import pyautogui
+except ImportError:
+    print("Could not import Pyautogui - some niceties may not work", file=sys.stderr)
+    pyautogui = None
+
 
 
 TEMP_ACTION_ID = "temp_action"
@@ -15,7 +55,7 @@ bl_info = {
     "category": "Object",
 }
 
-def limpa_escrita(context):
+def scene_cleanup(context):
 
     for grease in bpy.data.grease_pencil:
         bpy.data.grease_pencil.remove(grease)
@@ -36,6 +76,21 @@ def limpa_escrita(context):
         if action.name.startswith("temp_"):
             bpy.data.actions.remove(action)
 
+    press_and_hold_grease_pencil_key(15)
+
+
+def press_and_hold_grease_pencil_key(timeout=15):
+    if not pyautogui:
+        print("No autogui")
+        return
+    def hold_key():
+        print("pressing 'd'")
+        pyautogui.keyDown("d")
+        time.sleep(timeout)
+        pyautogui.keyUp("d")
+
+    t = threading.Thread(target=hold_key)
+    t.start()
 
 
 def cleanup_speeds(v):
@@ -140,8 +195,8 @@ def concatenate_action(action, previous, ignore_height=True):
             value = point.co[1] + base_value - zero_value
 
             # descanbalhota:
-            if "rotation_euler" in curve.data_path:
-                value %= 360
+            #if "rotation_euler" in curve.data_path:
+                #value %= 360
             point.co[1] = value
 
 
@@ -231,7 +286,7 @@ class AutographClear(Operator):
 
     def execute(self, context):
 
-        limpa_escrita(context)
+        scene_cleanup(context)
         return {'FINISHED'}
 
 
@@ -261,9 +316,9 @@ class AutographPanel(Panel):
 
 
 def register():
-    print("Rodando o register")
+    print("Resgistering Autograph add-on")
     bpy.utils.register_module(__name__)
-    bpy.types.Scene.autograph = PointerProperty(type=AutoSettings)
+    # bpy.types.Scene.autograph = PointerProperty(type=AutoSettings)
 
 
 def unregister():
