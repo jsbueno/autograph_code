@@ -48,7 +48,10 @@ except ImportError:
 
 bl_info = {
     "name": "Autograph",
-    "category": "Object",
+    # "location": "View3D > Tools > Autograph"
+    "category": "Autograph",
+    "author": "João S. O. Bueno",
+    "version": (0, 2, 0)
 }
 
 
@@ -73,21 +76,8 @@ def scene_cleanup(context):
         if action.name.startswith("temp_"):
             bpy.data.actions.remove(action)
 
-    press_and_hold_grease_pencil_key(START_WRITTING_TIMEOUT)
-
-
-def press_and_hold_grease_pencil_key(timeout=15):
-    if not pyautogui:
-        print("No autogui")
-        return
-    def hold_key():
-        print("pressing 'd'")
-        pyautogui.keyDown("d")
-        time.sleep(timeout)
-        pyautogui.keyUp("d")
-
-    t = threading.Thread(target=hold_key)
-    t.start()
+    bpy.ops.screen.animation_cancel()
+    bpy.context.scene.frame_current = 0
 
 
 def cleanup_speeds(v):
@@ -310,19 +300,83 @@ class AutographClear(Operator):
     bl_label = "Limpar escrita"
     bl_options = {'REGISTER', 'UNDO'}
 
+    _timer = None
+    writting_started = False
+
     def execute(self, context):
 
         scene_cleanup(context)
-        return {'FINISHED'}
+
+        self.modal_func = self.check_writting_started
+
+        self._timer = context.window_manager.event_timer_add(0.2, context.window)
+        context.window_manager.modal_handler_add(self)
+
+        self.press_and_hold_grease_pencil_key(START_WRITTING_TIMEOUT)
+
+        return {'RUNNING_MODAL'}
+
+
+    def press_and_hold_grease_pencil_key(self, timeout=15):
+        self.writting_started = False
+        if not pyautogui:
+            print("No autogui")
+            return
+        def hold_key():
+            pyautogui.keyDown("t")
+            time.sleep(0.05)
+            pyautogui.keyUp("t")
+            start_time = time.time()
+            print("pressing 'd'")
+            pyautogui.keyDown("d")
+            try:
+                while time.time() - start_time < timeout:
+
+                    time.sleep(0.2)
+                    if self.writting_started:
+                        break
+            finally:
+                pyautogui.keyUp("d")
+
+        t = threading.Thread(target=hold_key)
+        t.start()
+
+
+    def check_writting_started(self, context):
+
+        try:
+            gp_layer = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"]
+        except (KeyError, IndexError, AttributeError):
+            print("No writting detected")
+            return None
+        print("Writting started")
+        self.writting_started = True
+        self.modal_func = self.check_writting_ended
+        gp_layer.line_change = 10
+        gp_layer.tint_color = (1, 0.5, 0.5)
+        gp_layer.tint_factor = 1.0
+
+        return None
+
+    def check_writting_ended(self, context):
+        return True
+
+
+    def modal(self, context, event):
+        if event.type == "TIMER":
+            if self.modal_func(context):
+                return {"FINISHED"}
+
+        return {"PASS_THROUGH"}
 
 
 class AutographPanel(Panel):
     """Creates a Panel in the scene context of the properties editor"""
-    bl_label = "Autograph"
+    bl_label = "Autograph v.%d.%d.%d" % bl_info['version']
     bl_idname = "AUTOGRAPH_part1"
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
-    bl_category = "Create"
+    bl_category = "Autograph"
     bl_context = "objectmode"
 
     def draw(self, context):
