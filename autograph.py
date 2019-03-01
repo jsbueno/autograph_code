@@ -24,12 +24,10 @@ def autograph_path():
 
     for pathcomp in os.environ["PATH"].split(os.pathsep)[::-1]:
         p = Path(pathcomp)
-        if p.name != "bin" not in pathcomp.lower():
+        if p.name != "bin":
             continue
         lib_path = p.parent / "lib" / pyversion_path / "site-packages"
-        if not lib_path.exists():
-            continue
-        if str(lib_path) in sys.path:
+        if (not lib_path.exists()) or str(lib_path) in sys.path:
             continue
         sys.path.insert(0, str(lib_path))
 
@@ -109,8 +107,8 @@ def cleanup_speeds(v):
                 stroke = []
     return new_v
 
-def autograph(context):
 
+def autograph(context):
 
     strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
 
@@ -204,7 +202,18 @@ def assemble_actions(context, action_list):
 
 
     autograph = bpy.data.objects[AUTOGRAPH_ID]
+
+    track_name =  AUTOGRAPH_ID.lower() + "_dance"
+    try:
+        old_track = autograph.animation_data.nla_tracks[track_name]
+    except KeyError:
+        pass
+    else:
+        autograph.animation_data.nla_tracks.remove(old_track)
+
     track = autograph.animation_data.nla_tracks.new()
+    track.name = track_name
+
     previous_end = 0
     prev_action = None
     for action_name in action_list:
@@ -228,13 +237,22 @@ def assemble_actions(context, action_list):
 
     context.scene.objects.active = autograph
 
+    # make armature visible so that it is added to the NLA
+    context.scene.layers[10] = True
+
+    # autograph.animation_data_clear()
+
     original_area = context.area.type
     context.area.type = "NLA_EDITOR"
+    bpy.ops.nla.selected_objects_add()
     track.select = True
     bpy.ops.nla.select_all_toggle(True)
     bpy.ops.nla.transition_add()
 
     context.area.type = original_area
+
+    # Hide armature to play animation:
+    context.scene.layers[10] = False
 
     return previous_end - 15
 
