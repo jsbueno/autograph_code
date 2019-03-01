@@ -1,6 +1,8 @@
 import os, sys
 import threading, time
 
+from contextlib import contextmanager
+
 import bpy
 from bpy.props import StringProperty, PointerProperty, BoolProperty
 from bpy.types import Panel, Operator, PropertyGroup
@@ -10,6 +12,11 @@ START_WRITTING_TIMEOUT = 15
 STOPPED_WRITTING_TIMEOUT = 3
 TEMP_ACTION_ID = "temp_action"
 AUTOGRAPH_ID = "Autograph"
+
+WRITTING_COLOR = (0, 0.1, 0)
+POST_WRITTING_COLOR = (0, 0, 0.2)
+
+ARMATURE_LAYER = 10
 
 
 def autograph_path():
@@ -78,6 +85,8 @@ def scene_cleanup(context):
 
     bpy.ops.screen.animation_cancel()
     bpy.context.scene.frame_current = 0
+    # bpy.data.grease_pencil["GPencil"].palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
+
 
 
 def cleanup_speeds(v):
@@ -97,6 +106,21 @@ def cleanup_speeds(v):
     return new_v
 
 
+@contextmanager
+def switch_context_area(context, area="NLA_EDITOR"):
+    original_area = context.area.type
+    context.area.type = area
+    yield
+    context.area.type = original_area
+
+
+@contextmanager
+def activate_layer(context, layer):
+    context.scene.layers[layer] = True
+    yield
+    context.scene.layers[layer] = False
+
+
 def autograph(context):
     """
     Main functionality -
@@ -108,7 +132,7 @@ def autograph(context):
     try:
         strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
     except IndexError:
-        print("No grease pencil writting found on file")
+        print("Can't start: No grease pencil writting found on scene.")
         return
 
     speed_per_stroke = []
@@ -219,13 +243,11 @@ def assemble_actions(context, action_list):
         try:
             action = bpy.data.actions[action_name]
         except Exception as error:
-            print(f"encrencou a action {action_name}")
+            print(f"Expected action not found {action_name!r}")
             continue
         new_action = action.copy()
         new_action.name = "temp_" + action_name
 
-        #if prev_action:
-            #concatenate_action(new_action, prev_action)
         strip = track.strips.new(action.name, previous_end, new_action)
         strip.select = False
         previous_end += action.frame_range[1] + 15
@@ -235,26 +257,14 @@ def assemble_actions(context, action_list):
 
     context.scene.objects.active = autograph
 
-    # make armature visible so that it is added to the NLA
-    context.scene.layers[10] = True
-
-    # autograph.animation_data_clear()
-
-    original_area = context.area.type
-    context.area.type = "NLA_EDITOR"
-    bpy.ops.nla.selected_objects_add()
-    track.select = True
-    bpy.ops.nla.select_all_toggle(True)
-    bpy.ops.nla.transition_add()
-
-    context.area.type = original_area
-
-    # Hide armature to play animation:
-    context.scene.layers[10] = False
+    with switch_context_area(context, "NLA_EDITOR"), activate_layer(context, ARMATURE_LAYER):
+        bpy.ops.nla.selected_objects_add()
+        track.select = True
+        bpy.ops.nla.select_all_toggle(True)
+        bpy.ops.nla.transition_add()
 
     return previous_end - 15
 
-    # bpy.data.objects[AUTOGRAPH_ID].animation_data.action = TEMP_ACTION_ID
 
 
 def autograph_test(context):
@@ -304,16 +314,13 @@ class AutographClear(Operator):
     writting_started = False
 
     def execute(self, context):
-
         scene_cleanup(context)
-
         self.modal_func = self.check_writting_started
 
         self._timer = context.window_manager.event_timer_add(0.2, context.window)
         context.window_manager.modal_handler_add(self)
 
         self.press_and_hold_grease_pencil_key(START_WRITTING_TIMEOUT)
-
         return {'RUNNING_MODAL'}
 
 
@@ -353,8 +360,12 @@ class AutographClear(Operator):
         self.writting_started = True
         self.modal_func = self.check_writting_ended
         gp_layer.line_change = 10
-        gp_layer.tint_color = (1, 0.5, 0.5)
+        gp_layer.tint_color = POST_WRITTING_COLOR
         gp_layer.tint_factor = 1.0
+        bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].line_change = 10
+
+        bpy.data.grease_pencil["GPencil"].palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
+
 
         return None
 
