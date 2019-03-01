@@ -1,12 +1,15 @@
 import os, sys
-
 import threading, time
-
 
 import bpy
 from bpy.props import StringProperty, PointerProperty, BoolProperty
-
 from bpy.types import Panel, Operator, PropertyGroup
+
+
+START_WRITTING_TIMEOUT = 15
+STOPPED_WRITTING_TIMEOUT = 3
+TEMP_ACTION_ID = "temp_action"
+AUTOGRAPH_ID = "Autograph"
 
 
 def autograph_path():
@@ -43,15 +46,11 @@ except ImportError:
     pyautogui = None
 
 
-
-TEMP_ACTION_ID = "temp_action"
-AUTOGRAPH_ID = "Autograph"
-
-
 bl_info = {
     "name": "Autograph",
     "category": "Object",
 }
+
 
 def scene_cleanup(context):
 
@@ -74,7 +73,7 @@ def scene_cleanup(context):
         if action.name.startswith("temp_"):
             bpy.data.actions.remove(action)
 
-    press_and_hold_grease_pencil_key(15)
+    press_and_hold_grease_pencil_key(START_WRITTING_TIMEOUT)
 
 
 def press_and_hold_grease_pencil_key(timeout=15):
@@ -109,27 +108,37 @@ def cleanup_speeds(v):
 
 
 def autograph(context):
+    """
+    Main functionality -
+    this will extract writting metrics from the active grease-pencil
+    layer, and use those to select the proper actions to be
+    associated with the main Autograph actor.
+    """
 
-    strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
+    try:
+        strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
+    except IndexError:
+        print("No grease pencil writting found on file")
+        return
 
-    velocidades = []
-    pressoes = []
-    pontos = []
+    speed_per_stroke = []
+    pressure_per_stroke = []
+    points = []
 
     for word, stroke in strokes.items():
-        velocidade = []; pressao = []
+        speed = []; pressao = []
         for i, point in stroke.points.items():
             if i == 0:
                 previous = point
                 continue
             pressao.append(point.pressure)
-            velocidade.append((point.co - previous.co).magnitude)
+            speed.append((point.co - previous.co).magnitude)
             previous = point
         if i <= 1:
             continue
-        velocidades.append(sum(velocidade) / len(velocidade))
-        pressoes.append(sum(pressao) / len(pressao))
-        pontos.append(i)
+        speed_per_stroke.append(sum(speed) / len(speed))
+        pressure_per_stroke.append(sum(pressao) / len(pressao))
+        points.append(i)
 
     bpy.ops.gpencil.convert(type='POLY', use_timing_data=True)
 
@@ -137,24 +146,24 @@ def autograph(context):
     points = bpy.data.curves[0].splines[0].points
 
     anim_curve.convert_to_samples(0, 20000)
-    velocidades_curvas = []
+    speed_per_stroke_curves = []
     prev = None
     for point in anim_curve.sampled_points:
         if prev == None:
             prev = point
             continue
-        velocidade = (point.co - prev.co).y
-        velocidades_curvas.append(velocidade)
+        speed = (point.co - prev.co).y
+        speed_per_stroke_curves.append(speed)
         prev = point
 
-    velocidades_curvas = cleanup_speeds(velocidades_curvas)
+    speed_per_stroke_curves = cleanup_speeds(speed_per_stroke_curves)
 
-    print(f"Velocidades a partir das curvas: {velocidades_curvas}")
+    print(f"Speeds measured from curves: {speed_per_stroke_curves}")
 
     # anum_curve = bpy.data.curves[0].animation_data.action.fcurves[0].sampled_points[i].co
 
 
-    print(f"velocidades={velocidades}\npressoes={pressoes}")
+    print(f"speed_per_stroke={speed_per_stroke}\npressure_per_stroke={pressure_per_stroke}")
 
 
 def concatenate_action(action, previous, ignore_height=True):
@@ -199,7 +208,6 @@ def concatenate_action(action, previous, ignore_height=True):
 
 
 def assemble_actions(context, action_list):
-
 
     autograph = bpy.data.objects[AUTOGRAPH_ID]
 
@@ -259,7 +267,6 @@ def assemble_actions(context, action_list):
     # bpy.data.objects[AUTOGRAPH_ID].animation_data.action = TEMP_ACTION_ID
 
 
-
 def autograph_test(context):
     total_frames = assemble_actions(
         context,
@@ -281,6 +288,7 @@ class Autograph(Operator):
 
         autograph(context)
         return {'FINISHED'}
+
 
 class AutographTest(Operator):
     """Launch Dance for Single Letter"""
@@ -308,7 +316,6 @@ class AutographClear(Operator):
         return {'FINISHED'}
 
 
-
 class AutographPanel(Panel):
     """Creates a Panel in the scene context of the properties editor"""
     bl_label = "Autograph"
@@ -334,9 +341,8 @@ class AutographPanel(Panel):
 
 
 def register():
-    print("Resgistering Autograph add-on")
+    print("Registering Autograph add-on")
     bpy.utils.register_module(__name__)
-    # bpy.types.Scene.autograph = PointerProperty(type=AutoSettings)
 
 
 def unregister():
