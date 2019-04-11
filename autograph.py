@@ -10,7 +10,7 @@ from bpy.types import Panel, Operator, PropertyGroup
 
 
 
-AUTOGRAPH_PHRASE = "escrevercomocorpo"
+AUTOGRAPH_PHRASE = "escrever com o corpo"
 
 START_WRITTING_TIMEOUT = 15
 STOPPED_WRITTING_TIMEOUT = 3
@@ -22,175 +22,7 @@ POST_WRITTING_COLOR = (0, 0, 0.2)
 
 ARMATURE_LAYER = 1
 
-
-ACTION_DATA = {
- 'a': [{'name': 'amanda_a_1'},
-  {'name': 'amanda_a_2'},
-  {'name': 'amanda_a_3'},
-  {'name': 'amanda_a_4'},
-  {'name': 'bia_a_1'},
-  {'name': 'jessica_a_1'},
-  {'name': 'jessica_a_2'},
-  {'name': 'jessica_a_3'},
-  {'name': 'jessica_a_4'},
-  {'name': 'samara_a_1'},
-  {'name': 'samara_a_2'},
-  {'name': 'samara_a_3'},
-  {'name': 'samara_a_4'},
-  {'name': 'thiago_a_1'},
-  {'name': 'thiago_a_2'},
-  {'name': 'thiago_a_3'},
-  {'name': 'thiago_a_4'},
-  {'name': 'tiago_a_1'},
-  {'name': 'tiago_a_2'},
-  {'name': 'tiago_a_3'},
-  {'name': 'tiago_a_4'},
-  {'name': 'tiago_a_5'},
-  {'name': 'tiago_a_6'}],
- 'aa': [{'name': 'samara_aa_1'},
-  {'name': 'samara_aa_2'},
-  {'name': 'samara_aa_3'},
-  {'name': 'samara_aa_4'}],
- 'aaa': [{'name': 'samara_aaa_1'},
-  {'name': 'samara_aaa_2'},
-  {'name': 'samara_aaa_3'},
-  {'name': 'samara_aaa_4'}],
- 'b': [{'name': 'bia_b_1'}],
- 'c': [{'name': 'jessica_c_1'},
-  {'name': 'jessica_c_2'},
-  {'name': 'jessica_c_3'},
-  {'name': 'jessica_c_4'},
-  {'name': 'jessica_c_5'},
-  {'name': 'jessica_c_6'}],
- 'd': [{'name': 'diego_d_1'},
-  {'name': 'helder_d_1'},
-  {'name': 'helder_d_3'},
-  {'name': 'helder_d_4'}],
- 'e': [{'name': 'bia_e_1'},
-  {'name': 'diego_e_1'},
-  {'name': 'helder_e_1'},
-  {'name': 'helder_e_2'},
-  {'name': 'helder_e_3'},
-  {'name': 'helder_e_4'},
-  {'name': 'jessica_e_1'},
-  {'name': 'jessica_e_2'},
-  {'name': 'jessica_e_3'},
-  {'name': 'jessica_e_4'},
-  {'name': 'jessica_e_5'},
-  {'name': 'jessica_e_6'},
-  {'name': 'jessica_e_7'}],
- 'g': [{'name': 'diego_g_1'},
-  {'name': 'thiago_g_1'},
-  {'name': 'thiago_g_2'},
-  {'name': 'thiago_g_3'},
-  {'name': 'thiago_g_4'},
-  {'name': 'tiago_g_1'},
-  {'name': 'tiago_g_2'},
-  {'name': 'tiago_g_3'},
-  {'name': 'tiago_g_4'}],
- 'h': [{'name': 'helder_h_1'},
-  {'name': 'helder_h_2'},
-  {'name': 'helder_h_3'},
-  {'name': 'thiago_h_1'},
-  {'name': 'thiago_h_2'},
-  {'name': 'thiago_h_3'},
-  {'name': 'thiago_h_4'},
-  {'name': 'thiago_h_5'}],
- 'i': [{'name': 'bia_i_1'},
-  {'name': 'diego_i_1'},
-  {'name': 'jessica_i_1'},
-  {'name': 'jessica_i_2'},
-  {'name': 'jessica_i_3'},
-  {'name': 'jessica_i_4'},
-  {'name': 'jessica_i_5'},
-  {'name': 'thiago_i_1'},
-  {'name': 'thiago_i_2'},
-  {'name': 'thiago_i_3'},
-  {'name': 'thiago_i_4'},
-  {'name': 'tiago_i_1'}],
- 'j': [{'name': 'jessi_j_2'},
-  {'name': 'jessica_j_'},
-  {'name': 'jessica_j_1'},
-  {'name': 'jessica_j_2'},
-  {'name': 'jessica_j_3'},
-  {'name': 'jessica_j_4'},
-  {'name': 'jessica_j_5'}],
- 'l': [{'name': 'helder_l_1'},
-  {'name': 'helder_l_2'},
-  {'name': 'helder_l_3'},
-  {'name': 'helder_l_4'}],
- 'm': [{'name': 'amanda_m_'},
-  {'name': 'amanda_m_1'},
-  {'name': 'amanda_m_2'},
-  {'name': 'amanda_m_3'},
-  {'name': 'samara_m_1'},
-  {'name': 'samara_m_2'},
-  {'name': 'samara_m_4'},
-  {'name': 'samra_m_3'}],
- 'n': [{'name': 'amanda_n_1'},
-  {'name': 'amanda_n_2'},
-  {'name': 'amanda_n_3'},
-  {'name': 'amanda_n_4'},
-  {'name': 'amanda_n_5'},
-  {'name': 'amanda_n_6'},
-  {'name': 'amanda_n_7'},
-  {'name': 'amanda_n_8'}],
- 'o': [{'name': 'diego_o_1'},
-  {'name': 'thiago_o_1'},
-  {'name': 'thiago_o_2'},
-  {'name': 'thiago_o_3'},
-  {'name': 'thiago_o_4'}],
- 'p': [{'name': 'bia_r_1'},
-  {'name': 'helder_r_1'},
-  {'name': 'helder_r_2'},
-  {'name': 'helder_r_3'},
-  {'name': 'helder_r_4'},
-  {'name': 'samara_r_1'},
-  {'name': 'samara_r_2'},
-  {'name': 'samara_r_3'},
-  {'name': 'samara_r_4'}],
- 'r': [{'name': 'bia_r_1'},
-  {'name': 'helder_r_1'},
-  {'name': 'helder_r_2'},
-  {'name': 'helder_r_3'},
-  {'name': 'helder_r_4'},
-  {'name': 'samara_r_1'},
-  {'name': 'samara_r_2'},
-  {'name': 'samara_r_3'},
-  {'name': 'samara_r_4'}],
- 's': [{'name': 'jessica_s_1'},
-  {'name': 'jessica_s_2'},
-  {'name': 'jessica_s_3'},
-  {'name': 'jessica_s_4'},
-  {'name': 'jessica_s_5'},
-  {'name': 'jessica_s_6'},
-  {'name': 'samara_s_1'},
-  {'name': 'samara_s_2'},
-  {'name': 'samara_s_3'},
-  {'name': 'samara_s_4'},
-  {'name': 'thiago_s_1'},
-  {'name': 'thiago_s_2'},
-  {'name': 'thiago_s_3'},
-  {'name': 'thiago_s_4'},
-  {'name': 'thiago_s_5'},
-  {'name': 'thiago_s_6'}],
- 't': [{'name': 'bia_t_1'},
-  {'name': 'thiago_t_1'},
-  {'name': 'thiago_t_2'},
-  {'name': 'thiago_t_3'},
-  {'name': 'thiago_t_4'}],
- 'v': [{'name': 'helder_w_1'},
-  {'name': 'helder_w_2'},
-  {'name': 'helder_w_3'},
-  {'name': 'helder_w_4'},
-  {'name': 'helder_w_5'}],
- 'w': [{'name': 'helder_w_1'},
-  {'name': 'helder_w_2'},
-  {'name': 'helder_w_3'},
-  {'name': 'helder_w_4'},
-  {'name': 'helder_w_5'}],
- 'z': [{'name': 'bia_z_1'}]}
-
+from autograph_action_data import data as ACTION_DATA
 
 
 def autograph_path():
@@ -398,8 +230,14 @@ def concatenate_action(action, previous, ignore_height=True):
 def get_action_names(phrase):
     actions = []
     for letter in phrase:
+        if letter not in ACTION_DATA:
+            # If there is no action for a letter or punctuation on the tarhet
+            # phrase, just skip it.
+            print(f"Could not find action for {letter!r} ")
+            continue
         action = random.choice(ACTION_DATA[letter])["name"]
         actions.append(action)
+    print(actions)
     return actions
 
 
@@ -554,6 +392,19 @@ class AutographClear(Operator):
         return False
 
     def check_writting_ended(self, context):
+        """Unfortunately this could not be made to work -
+
+        The idea would be to keep polling the grease-pencil objects, so that
+        if a perceived time-lapse of ~3 seconds would pass with no new points
+        added to the writting, signal the end of the written text
+        and proceed to enact the dance.
+        However, there is no way to pool a grease-pencil stroke _while_ it is been
+        written - its length is always "0" even though writting is underway.
+
+        So we have to resort to explictly calling the autograph dance button
+        on the pannel when writing is over.
+
+        """
         return False
 
         #try:
