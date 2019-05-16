@@ -13,8 +13,11 @@ import csv
 from pathlib import Path
 from pprint import pformat
 
+# Filename bellow is as exported by the spreadsheet where each
+# action sequence is paramterized by the artistic author.
+# The file is exported as CSV from google-drive/sheets and read by this script
 filepath = Path("AUTOGRAPH TABELA INTENSIDADES - repertorio.csv")
-headers = "name speed pressure direction size frames letter_notes new_file_name".split()
+headers = "name speed pressure direction size frames letter_notes letter".split()
 reader = csv.reader(filepath.open())
 raw_data = list(reader)
 data = [dict(zip(headers, row))  for row in raw_data[5:]]
@@ -22,11 +25,18 @@ data = [dict(zip(headers, row))  for row in raw_data[5:]]
 per_letter_data = {}
 for row in data:
     letter_notes = row.get("letter_notes", "*")
-    letter = letter_notes.strip().lower()[0] if letter_notes.strip() else "*"
-    if letter == "*" and row.get("name", "").count("_") >= 2:
-        tmp = row["name"].split("_")[1]
-        if len(tmp) == 1:
-            letter = tmp.lower()
+    # letter = letter_notes.strip().lower()[0] if letter_notes.strip() else "*"
+    letter = row.get("letter").strip()
+    if letter == "#":
+        letter = " "
+
+    #if letter == "*" and row.get("name", "").count("_") >= 2:
+        #tmp = row["name"].split("_")[1]
+        #if len(tmp) == 1:
+            #letter = tmp.lower()
+    if not row.get("pressure"):
+        # Do not annotate letters not yet parametrized
+        continue
     per_letter_data.setdefault(letter, []).append(row)
 
 # This generated file should be placed where Blender's Python can find it -
