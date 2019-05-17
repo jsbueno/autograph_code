@@ -2,6 +2,7 @@ import os, sys
 import random
 import threading, time
 
+from collections import namedtuple
 from contextlib import contextmanager
 
 import bpy
@@ -11,9 +12,10 @@ from bpy.types import Panel, Operator, PropertyGroup
 
 
 AUTOGRAPH_PHRASE = "escrever com o corpo"
+# AUTOGRAPH_PHRASE = "escrever"
 
 START_WRITTING_TIMEOUT = 15
-STOPPED_WRITTING_TIMEOUT = 3
+STOPPED_WRITTING_TIMEOUT = 7
 TEMP_ACTION_ID = "temp_action"
 AUTOGRAPH_ID = "Autograph_Skel"
 
@@ -21,6 +23,9 @@ WRITTING_COLOR = (0, 0.1, 0)
 POST_WRITTING_COLOR = (0, 0, 0.2)
 
 ARMATURE_LAYER = 1
+ACTION_SPACING = 15
+
+ROOT_X_NAME = """pose.bones["pelvis"].location"""
 
 from autograph_action_data import data as ACTION_DATA
 
@@ -64,7 +69,7 @@ bl_info = {
     # "location": "View3D > Tools > Autograph"
     "category": "Autograph",
     "author": "João S. O. Bueno",
-    "version": (0, 2, 0)
+    "version": (0, 99, 0)
 }
 
 
@@ -94,7 +99,12 @@ def scene_cleanup(context):
     # bpy.data.grease_pencil["GPencil"].palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
 
 
-def cleanup_speeds(v):
+def cleanup_and_merge_speeds(v):
+    """Removes speed artifacts that take place
+    at starting and end of each stroke.
+
+    Also, join all speed data in a plain list, without nested data.
+    """
     new_v = []
     started = False
     stroke = []
@@ -106,8 +116,10 @@ def cleanup_speeds(v):
             stroke.append(value)
         else:
             if stroke:
-                new_v.append(stroke)
+                new_v.extend(stroke)
                 stroke = []
+    if stroke:
+        new_v.extend(stroke)
     return new_v
 
 
@@ -127,6 +139,36 @@ def activate_layer(context, layer):
     context.scene.layers[layer] = original_value
 
 
+def average_value_per_letter(phrase, measured_points, normalize=(0, 1)):
+    """Re-sample measurements according to the number of
+    letters expcted in the writting.
+
+    Also normalize measured points so that points at the extremes
+    passed are mapped to the 0-1 range.
+
+
+    Important: samples are taken relative to time of writting -
+    so these values are for "neighborhood" of the letter.
+
+    In a stage when we have proper writting recognition
+    built-in, the values may be yielded exactly for each glyph.
+    """
+    trimmed_phrase = phrase.replace(" ", "")
+    factor = len(measured_points) / len(trimmed_phrase)
+    if factor < 1:
+        return measured_points
+    new_points = []
+    norm_factor = 1 / (normalize[1] - normalize[0])
+    for i, letter in enumerate(phrase):
+        if letter == " ":
+            new_points.append(0)
+            continue
+        points_value = sum(measured_points[int(i * factor): int((i + 1) * factor)]) / factor
+        points_value = (points_value - normalize[0]) * norm_factor
+        new_points.append(points_value)
+    return new_points
+
+
 def autograph(context):
     """
     Main functionality -
@@ -141,49 +183,71 @@ def autograph(context):
         print("Can't start: No grease pencil writting found on scene.")
         return
 
-    speed_per_stroke = []
-    pressure_per_stroke = []
-    points = []
+    speed = []; pressure = []
 
     for word, stroke in strokes.items():
-        speed = []; pressao = []
         for i, point in stroke.points.items():
             if i == 0:
                 previous = point
                 continue
-            pressao.append(point.pressure)
+            pressure.append(point.pressure)
             speed.append((point.co - previous.co).magnitude)
             previous = point
-        if i <= 1:
-            continue
-        speed_per_stroke.append(sum(speed) / len(speed))
-        pressure_per_stroke.append(sum(pressao) / len(pressao))
-        points.append(i)
 
-    bpy.ops.gpencil.convert(type='POLY', use_timing_data=True)
 
-    anim_curve = bpy.data.curves[0].animation_data.action.fcurves[0]
-    points = bpy.data.curves[0].splines[0].points
+    pressure_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, pressure, normalize=[0.3, 1.0])
+    speed_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, speed, normalize=[0.02, 0.08])
 
-    anim_curve.convert_to_samples(0, 20000)
-    speed_per_stroke_curves = []
-    prev = None
-    for point in anim_curve.sampled_points:
-        if prev == None:
-            prev = point
-            continue
-        speed = (point.co - prev.co).y
-        speed_per_stroke_curves.append(speed)
-        prev = point
+    phrase_data = [{'pressure': p, 'speed': sp} for p, sp in zip(pressure_per_letter, speed_per_letter)]
 
-    speed_per_stroke_curves = cleanup_speeds(speed_per_stroke_curves)
+    print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
 
-    print(f"Speeds measured from curves: {speed_per_stroke_curves}")
+    autograph_ignite(context, phrase_data)
+
+
+"""
+# old autograph measuring code - would measure speed points after resampling curves -
+# methods called here may be usefull to extract other parameters from the writting in the future
+
+
+    #bpy.ops.gpencil.convert(type='POLY', use_timing_data=True)
+
+    #anim_curve = bpy.data.curves[0].animation_data.action.fcurves[0]
+    #points = bpy.data.curves[0].splines[0].points
+
+    #anim_curve.convert_to_samples(0, 20000)
+    #speed_per_stroke_curves = []
+    #prev = None
+    #for point in anim_curve.sampled_points:
+        #if prev == None:
+            #prev = point
+            #continue
+        #speed = (point.co - prev.co).y
+        #speed_per_stroke_curves.append(speed)
+        #prev = point
+
+    #speed_per_stroke_curves = cleanup_speeds(speed_per_stroke_curves)
 
     # anum_curve = bpy.data.curves[0].animation_data.action.fcurves[0].sampled_points[i].co
 
+"""
 
-    print(f"speed_per_stroke={speed_per_stroke}\npressure_per_stroke={pressure_per_stroke}")
+def autograph_ignite(context, phrase_data):
+    """Orchestrates the actual dance:
+
+    the call to "assemble_actions" will pick the best action for each
+    letter in the pre-defined phrase, based on the writting parameters
+    measured and use Blenders capabilities to create a dinamic
+    animation concatenating the actions.
+
+    Then, it starts the dance!
+
+    """
+    total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data)
+    context.scene.frame_end = total_frames
+
+    bpy.ops.screen.animation_play()
+
 
 
 def concatenate_action(action, previous, ignore_height=True):
@@ -227,23 +291,96 @@ def concatenate_action(action, previous, ignore_height=True):
             point.co[1] = value
 
 
-def get_action_names(phrase):
+def _get_int_or_default(dct, key, default=5):
+    value = dct.get(key, "")
+    return int(value) if value.isdigit() else default
+
+
+def get_best_action(letter, letter_data):
+    """Given features of choice, uses a vector space based
+    on the mark for each of the features, and find the smallest
+    distance of an action to the parameters of the current glyph
+    on this space.
+
+    Currently, features analyzed are hardcoded to pressure and speed
+
+    """
+
+    Features = namedtuple("Features", "pressure speed")
+
+    pressure = letter_data.get("pressure", 0.5) * 10
+    speed = letter_data.get("speed", 0.5) * 10
+
+    feature_vector = Features(pressure, speed)
+
+    plain_actions = ACTION_DATA[letter]
+    indexed_actions = {}
+    for action in plain_actions:
+        pressure = _get_int_or_default(action, "pressure")
+        speed = _get_int_or_default(action, "speed")
+        indexed_actions[Features(pressure, speed)] = action["name"]
+
+    def proximity(item):
+        nonlocal feature_vector
+
+        vector, _ = item
+        distance = 0
+        for component_1, component_2 in zip(vector, feature_vector):
+            distance += (component_1 - component_2) ** 2
+        distance **= 0.5
+        return distance
+
+    sorted_actions = sorted(indexed_actions.items(), key=proximity)
+
+    print(f"**** {letter} - {feature_vector} : {sorted_actions}")
+    if sorted_actions:
+        return sorted_actions[0][1]
+    return None
+
+
+
+def get_action_names(phrase, phrase_data):
     actions = []
-    for letter in phrase:
+    if not phrase_data:
+        phrase_data = map(lambda: {}, phrase)
+    for letter, letter_data in zip(phrase, phrase_data):
         if letter not in ACTION_DATA:
-            # If there is no action for a letter or punctuation on the tarhet
+            # If there is no action for a letter or punctuation on the target
             # phrase, just skip it.
             print(f"Could not find action for {letter!r} ")
             continue
-        action = random.choice(ACTION_DATA[letter])["name"]
+        action = get_best_action(letter, letter_data)
+        if not action:
+            action = random.choice(ACTION_DATA[letter])["name"]
         actions.append(action)
     print(actions)
     return actions
 
 
-def assemble_actions(context, phrase):
+def get_root_x_curve(action):
+    """Find curve containing the X - coordinates for the Pelvis bone,
+    to which all other coordinates are subordinated
+    """
+    for curve in action.fcurves:
+        if curve.data_path == ROOT_X_NAME:
+            break
+    else:
+        return None
+    return curve
 
-    action_list = get_action_names(phrase)
+
+def get_final_x_location(action):
+    """Get final x coordinate for the root bone in each action """
+    curve = get_root_x_curve(action)
+    if not curve:
+        return 0
+    points = curve.keyframe_points
+    return points[-1].co
+
+
+def assemble_actions(context, phrase, phrase_data=None):
+
+    action_list = get_action_names(phrase, phrase_data)
 
     autograph = bpy.data.objects[AUTOGRAPH_ID]
 
@@ -260,6 +397,7 @@ def assemble_actions(context, phrase):
 
     previous_end = 0
     prev_action = None
+    x_offset = 0
     for action_name in action_list:
 
         try:
@@ -268,12 +406,22 @@ def assemble_actions(context, phrase):
             print(f"Expected action not found {action_name!r}")
             continue
         new_action = action.copy()
+
         new_action.name = "temp_" + action_name
 
+        def adjust_next_action(action, x_offset):
+            root_x_curve  = get_root_x_curve(action)
+            for point in root_x_curve.keyframe_points:
+                point.co[1] += x_offset
+            return point.co[1]
+
+
+        x_offset = adjust_next_action(new_action, x_offset)
         strip = track.strips.new(action.name, previous_end, new_action)
         strip.select = False
-        previous_end += action.frame_range[1] + 15
+        previous_end += action.frame_range[1] + ACTION_SPACING
         prev_action = new_action
+
 
     previous_strip = None
 
@@ -285,7 +433,7 @@ def assemble_actions(context, phrase):
         bpy.ops.nla.select_all_toggle(True)
         bpy.ops.nla.transition_add()
 
-    return previous_end - 15
+    return previous_end - ACTION_SPACING
 
 
 
@@ -374,7 +522,6 @@ class AutographClear(Operator):
         try:
             gp_layer = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"]
         except (KeyError, IndexError, AttributeError):
-            print("No writting detected")
             return False
         print("Writting started")
         self.writting_started = True
@@ -405,27 +552,28 @@ class AutographClear(Operator):
         on the pannel when writing is over.
 
         """
+        # return False
+
+        try:
+            strokes = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].active_frame.strokes
+        except (IndexError, KeyError, AttributeError):
+            print("No writting - something went wrong")
+            return True
+        if len(strokes) and (len(strokes) > self.check_write_strokes or len(strokes[-1].points) > self.check_write_points):
+            self.check_write_time = time.time()
+            self.check_write_strokes = len(strokes)
+            self.check_write_points = len(strokes[-1].points)
+
+            return False
+
+        if time.time() - self.check_write_time > STOPPED_WRITTING_TIMEOUT:
+            if pyautogui:
+                pyautogui.press("escape")
+                autograph(context)
+                # pyautogui.press("t")
+
+            return True
         return False
-
-        #try:
-            #strokes = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].active_frame.strokes
-        #except (IndexError, KeyError, AttributeError):
-            #print("No writting - something went wrong")
-            #return True
-        #if len(strokes) and (len(strokes) > self.check_write_strokes or len(strokes[-1].points) > self.check_write_points):
-            #self.check_write_time = time.time()
-            #self.check_write_strokes = len(strokes)
-            #self.check_write_points = len(strokes[-1].points)
-
-            #return False
-
-        #if time.time() - self.check_write_time > STOPPED_WRITTING_TIMEOUT:
-            #if pyautogui:
-                #pyautogui.press("escape")
-                #pyautogui.press("t")
-
-            #return True
-        #return False
 
 
     def modal(self, context, event):
@@ -446,7 +594,6 @@ class AutographPanel(Panel):
     bl_context = "objectmode"
 
     def draw(self, context):
-        print("autograph")
         layout = self.layout
 
         scene = context.scene
