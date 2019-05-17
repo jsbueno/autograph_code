@@ -41,7 +41,7 @@ def autograph_path():
     import sys, os
     from pathlib import Path
 
-    pyversion_path = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    pyversion_path = "python{}.{}".format(sys.version_info.major, sys.version_info.minor)
 
     for pathcomp in os.environ["PATH"].split(os.pathsep)[::-1]:
         p = Path(pathcomp)
@@ -52,7 +52,7 @@ def autograph_path():
             continue
         sys.path.insert(0, str(lib_path))
 
-        print(f"Autograph extension: prepended {lib_path!r} to PYTHONPATH")
+        print("Autograph extension: prepended {} to PYTHONPATH".format(lib_path))
 
 
 autograph_path()
@@ -200,7 +200,7 @@ def autograph(context):
 
     phrase_data = [{'pressure': p, 'speed': sp} for p, sp in zip(pressure_per_letter, speed_per_letter)]
 
-    print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
+    # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
 
     autograph_ignite(context, phrase_data)
 
@@ -261,7 +261,7 @@ def concatenate_action(action, previous, ignore_height=True):
     "sink into the ground" after an action that ends in a lower plane
 
     """
-    print(f"concatenating actions {previous.name} and {action.name}")
+    # print(f"concatenating actions {previous.name} and {action.name}")
 
     curve_indexes = [0, 1, 2, 3, 4, 5]
     # rotation_indexes = [3, 4, 5]
@@ -332,7 +332,7 @@ def get_best_action(letter, letter_data):
 
     sorted_actions = sorted(indexed_actions.items(), key=proximity)
 
-    print(f"**** {letter} - {feature_vector} : {sorted_actions}")
+    # print(f"**** {letter} - {feature_vector} : {sorted_actions}")
     if sorted_actions:
         return sorted_actions[0][1]
     return None
@@ -347,7 +347,7 @@ def get_action_names(phrase, phrase_data):
         if letter not in ACTION_DATA:
             # If there is no action for a letter or punctuation on the target
             # phrase, just skip it.
-            print(f"Could not find action for {letter!r} ")
+            # print(f"Could not find action for {letter!r} ")
             continue
         action = get_best_action(letter, letter_data)
         if not action:
@@ -403,7 +403,7 @@ def assemble_actions(context, phrase, phrase_data=None):
         try:
             action = bpy.data.actions[action_name]
         except Exception as error:
-            print(f"Expected action not found {action_name!r}")
+            print("Expected action not found: ",  action_name)
             continue
         new_action = action.copy()
 
