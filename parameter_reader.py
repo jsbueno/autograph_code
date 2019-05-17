@@ -17,13 +17,14 @@ from pprint import pformat
 # action sequence is paramterized by the artistic author.
 # The file is exported as CSV from google-drive/sheets and read by this script
 filepath = Path("AUTOGRAPH TABELA INTENSIDADES - repertorio.csv")
-headers = "name speed pressure direction size frames letter_notes letter".split()
+headers = "name speed pressure direction size old_frames letter_notes letter frames".split()
 reader = csv.reader(filepath.open())
 raw_data = list(reader)
 data = [dict(zip(headers, row))  for row in raw_data[5:]]
 
 per_letter_data = {}
 for row in data:
+    row.pop("old_frames", "")
     letter_notes = row.get("letter_notes", "*")
     # letter = letter_notes.strip().lower()[0] if letter_notes.strip() else "*"
     letter = row.get("letter").strip()

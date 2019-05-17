@@ -9,9 +9,10 @@ import bpy
 from bpy.props import StringProperty, PointerProperty, BoolProperty
 from bpy.types import Panel, Operator, PropertyGroup
 
+import flipper
 
 
-AUTOGRAPH_PHRASE = "escrever com o corpo"
+AUTOGRAPH_PHRASE = "  escrever com o corpo  "
 # AUTOGRAPH_PHRASE = "escrever"
 
 START_WRITTING_TIMEOUT = 15
@@ -22,7 +23,7 @@ AUTOGRAPH_ID = "Autograph_Skel"
 WRITTING_COLOR = (0, 0.1, 0)
 POST_WRITTING_COLOR = (0, 0, 0.2)
 
-ARMATURE_LAYER = 1
+ARMATURE_LAYER = 2
 ACTION_SPACING = 15
 
 ROOT_X_NAME = """pose.bones["pelvis"].location"""
@@ -153,7 +154,7 @@ def average_value_per_letter(phrase, measured_points, normalize=(0, 1)):
     In a stage when we have proper writting recognition
     built-in, the values may be yielded exactly for each glyph.
     """
-    trimmed_phrase = phrase.replace(" ", "")
+    trimmed_phrase = phrase # .replace(" ", "")
     factor = len(measured_points) / len(trimmed_phrase)
     if factor < 1:
         return measured_points
@@ -318,7 +319,7 @@ def get_best_action(letter, letter_data):
     for action in plain_actions:
         pressure = _get_int_or_default(action, "pressure")
         speed = _get_int_or_default(action, "speed")
-        indexed_actions[Features(pressure, speed)] = action["name"]
+        indexed_actions[Features(pressure, speed)] = action
 
     def proximity(item):
         nonlocal feature_vector
@@ -351,7 +352,7 @@ def get_action_names(phrase, phrase_data):
             continue
         action = get_best_action(letter, letter_data)
         if not action:
-            action = random.choice(ACTION_DATA[letter])["name"]
+            action = random.choice(ACTION_DATA[letter])
         actions.append(action)
     print(actions)
     return actions
@@ -398,7 +399,13 @@ def assemble_actions(context, phrase, phrase_data=None):
     previous_end = 0
     prev_action = None
     x_offset = 0
-    for action_name in action_list:
+    for action_data in action_list:
+        action_name = action_data["name"]
+        frames_str = action_data.get("frames")
+        if frames_str.strip():
+            frames = [int(v.strip()) for v in frames_str.split("-")]
+        else:
+            frames = None
 
         try:
             action = bpy.data.actions[action_name]
@@ -415,11 +422,20 @@ def assemble_actions(context, phrase, phrase_data=None):
                 point.co[1] += x_offset
             return point.co[1]
 
-
         x_offset = adjust_next_action(new_action, x_offset)
         strip = track.strips.new(action.name, previous_end, new_action)
+        if frames:
+            strip.action_frame_start = frames[0]
+            strip.action_frame_end = frames[1]
+            total_frames = frames[1] - frames[0]
+            # there might be flips
+            flips = flipper.find_flips(action, frames[0], frames[1] + 1)
+            if flips:
+                flipper.invert_flips(action, flips, frames[0], frames[1] + 1)
+        else:
+            total_frames = new_action.frame_range[1]
         strip.select = False
-        previous_end += action.frame_range[1] + ACTION_SPACING
+        previous_end += total_frames + ACTION_SPACING
         prev_action = new_action
 
 
