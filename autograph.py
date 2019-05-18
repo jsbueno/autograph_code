@@ -416,22 +416,22 @@ def assemble_actions(context, phrase, phrase_data=None):
 
         new_action.name = "temp_" + action_name
 
-        def adjust_next_action(action, x_offset):
+        def adjust_next_action(action, x_offset, frames):
             root_x_curve  = get_root_x_curve(action)
             for point in root_x_curve.keyframe_points:
                 point.co[1] += x_offset
             return point.co[1]
 
-        x_offset = adjust_next_action(new_action, x_offset)
+        x_offset = adjust_next_action(new_action, x_offset, frames)
         strip = track.strips.new(action.name, previous_end, new_action)
         if frames:
             strip.action_frame_start = frames[0]
             strip.action_frame_end = frames[1]
             total_frames = frames[1] - frames[0]
             # there might be flips
-            flips = flipper.find_flips(action, frames[0], frames[1] + 1)
+            flips = flipper.find_flips(new_action, frames[0], frames[1] + 1)
             if flips:
-                flipper.invert_flips(action, flips, frames[0], frames[1] + 1)
+                flipper.invert_flips(new_action, flips, frames[0], frames[1] + 1)
         else:
             total_frames = new_action.frame_range[1]
         strip.select = False
