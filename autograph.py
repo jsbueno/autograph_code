@@ -12,11 +12,12 @@ from bpy.types import Panel, Operator, PropertyGroup
 import flipper
 
 
-AUTOGRAPH_PHRASE = "  escrever com o corpo  "
-# AUTOGRAPH_PHRASE = "escrever"
+AUTOGRAPH_PHRASE = "escrever com o corpo"
+
+SPACE_MARGIN = 2
 
 START_WRITTING_TIMEOUT = 15
-STOPPED_WRITTING_TIMEOUT = 7
+STOPPED_WRITTING_TIMEOUT = 6
 TEMP_ACTION_ID = "temp_action"
 AUTOGRAPH_ID = "Autograph_Skel"
 
@@ -140,7 +141,7 @@ def activate_layer(context, layer):
     context.scene.layers[layer] = original_value
 
 
-def average_value_per_letter(phrase, measured_points, normalize=(0, 1)):
+def average_value_per_letter(phrase, measured_points, normalize=(0, 1), number_written_letters=len(AUTOGRAPH_PHRASE)):
     """Re-sample measurements according to the number of
     letters expcted in the writting.
 
@@ -154,7 +155,8 @@ def average_value_per_letter(phrase, measured_points, normalize=(0, 1)):
     In a stage when we have proper writting recognition
     built-in, the values may be yielded exactly for each glyph.
     """
-    trimmed_phrase = phrase # .replace(" ", "")
+    phrase = phrase[:number_written_letters]
+    trimmed_phrase = phrase.replace(" ", "")
     factor = len(measured_points) / len(trimmed_phrase)
     if factor < 1:
         return measured_points
@@ -162,12 +164,55 @@ def average_value_per_letter(phrase, measured_points, normalize=(0, 1)):
     norm_factor = 1 / (normalize[1] - normalize[0])
     for i, letter in enumerate(phrase):
         if letter == " ":
-            new_points.append(0)
+            # for spaces, copy parameters from the previous drawn letter
+            new_points.append(new_points[-1] if new_points else 0)
             continue
         points_value = sum(measured_points[int(i * factor): int((i + 1) * factor)]) / factor
         points_value = (points_value - normalize[0]) * norm_factor
         new_points.append(points_value)
     return new_points
+
+
+def guess_written_phrase_size(strokes, speed):
+
+    phrase = AUTOGRAPH_PHRASE
+
+    average_points_per_letter = 42
+    minimal_points_per_letter = 22
+
+    num_words = len(AUTOGRAPH_PHRASE.split())
+    total_points = sum(len(stroke.points) for stroke in strokes)
+    result = -1
+    if len(strokes) < num_words:
+        # probably the phrase was truncated
+        # use average of 40 points on strokes per letter - ignore speed for this guess.
+        result = total_points // average_points_per_letter
+
+    elif num_words < len(strokes) < num_words + 3:
+        # cursive text - (not one stroke per letter)
+        words = iter(phrase.split())
+        word = next(words, "")
+        for stroke in strokes:
+            if len(stroke.points) / minimal_points_per_letter >= len(word):
+                word = next(words, "")
+        word = next(words, "")
+        if word:
+            # strokes not long enough to draw all words in the phrase -> predict truncated size
+            result = total_points // average_points_per_letter
+
+    else:
+        # a lot of strokes - either user tried to imitate printing types (letra de forma)
+        # or we just have a mess of points and traces.
+        if total_points <= minimal_points_per_letter * len(phrase.replace(" ", "")):
+            result = total_points // average_points_per_letter
+    if result == -1:
+        # Assume the whole phrase
+        result = len(phrase)
+    elif result == 0:
+        result = 1
+
+    print("Assuming written text to be: {!r}".format(phrase[:result]))
+    return result
 
 
 def autograph(context):
@@ -195,15 +240,16 @@ def autograph(context):
             speed.append((point.co - previous.co).magnitude)
             previous = point
 
+    number_written_letters = guess_written_phrase_size(strokes, speed)
 
-    pressure_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, pressure, normalize=[0.3, 1.0])
-    speed_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, speed, normalize=[0.02, 0.08])
+    pressure_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, pressure, [0.3, 1.0], number_written_letters)
+    speed_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, speed, [0.02, 0.08], number_written_letters)
 
     phrase_data = [{'pressure': p, 'speed': sp} for p, sp in zip(pressure_per_letter, speed_per_letter)]
 
     # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
 
-    autograph_ignite(context, phrase_data)
+    autograph_ignite(context, phrase_data, number_written_letters)
 
 
 """
@@ -233,7 +279,7 @@ def autograph(context):
 
 """
 
-def autograph_ignite(context, phrase_data):
+def autograph_ignite(context, phrase_data, number_written_letters):
     """Orchestrates the actual dance:
 
     the call to "assemble_actions" will pick the best action for each
@@ -244,7 +290,7 @@ def autograph_ignite(context, phrase_data):
     Then, it starts the dance!
 
     """
-    total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data)
+    total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data, number_written_letters)
     context.scene.frame_end = total_frames
 
     bpy.ops.screen.animation_play()
@@ -343,15 +389,17 @@ def get_best_action(letter, letter_data):
 def get_action_names(phrase, phrase_data):
     actions = []
     if not phrase_data:
-        phrase_data = map(lambda: {}, phrase)
+        phrase_data = map(lambda x: {}, phrase)
     for letter, letter_data in zip(phrase, phrase_data):
         if letter not in ACTION_DATA:
             # If there is no action for a letter or punctuation on the target
             # phrase, just skip it.
-            # print(f"Could not find action for {letter!r} ")
+            print("Could not find action for {letter!r} ".format(letter=letter))
             continue
         action = get_best_action(letter, letter_data)
         if not action:
+
+            print("Could not match a good action for {letter!r} - picking random action".format(letter=letter))
             action = random.choice(ACTION_DATA[letter])
         actions.append(action)
     print(actions)
@@ -379,7 +427,16 @@ def get_final_x_location(action):
     return points[-1].co
 
 
-def assemble_actions(context, phrase, phrase_data=None):
+def assemble_actions(context, phrase, phrase_data=None, number_written_letters=len(AUTOGRAPH_PHRASE)):
+
+    # Insert space actions at start and end of text to be danced:
+
+    phrase = "{spaces}{phrase}{spaces}".format(phrase=phrase[:number_written_letters], spaces=" " * SPACE_MARGIN)
+    if phrase_data:
+        for i in range(SPACE_MARGIN):
+            phrase_data.insert(0, phrase_data[0])
+            phrase_data.append(phrase_data[-1])
+
 
     action_list = get_action_names(phrase, phrase_data)
 
@@ -399,6 +456,7 @@ def assemble_actions(context, phrase, phrase_data=None):
     previous_end = 0
     prev_action = None
     x_offset = 0
+    total_actions = 0
     for action_data in action_list:
         action_name = action_data["name"]
         frames_str = action_data.get("frames")
@@ -424,6 +482,7 @@ def assemble_actions(context, phrase, phrase_data=None):
 
         x_offset = adjust_next_action(new_action, x_offset, frames)
         strip = track.strips.new(action.name, previous_end, new_action)
+        total_actions += 1
         if frames:
             strip.action_frame_start = frames[0]
             strip.action_frame_end = frames[1]
@@ -443,11 +502,12 @@ def assemble_actions(context, phrase, phrase_data=None):
 
     context.scene.objects.active = autograph
 
-    with switch_context_area(context, "NLA_EDITOR"), activate_layer(context, ARMATURE_LAYER):
-        bpy.ops.nla.selected_objects_add()
-        track.select = True
-        bpy.ops.nla.select_all_toggle(True)
-        bpy.ops.nla.transition_add()
+    if total_actions > 1:
+        with switch_context_area(context, "NLA_EDITOR"), activate_layer(context, ARMATURE_LAYER):
+            bpy.ops.nla.selected_objects_add()
+            track.select = True
+            bpy.ops.nla.select_all_toggle(True)
+            bpy.ops.nla.transition_add()
 
     return previous_end - ACTION_SPACING
 
@@ -564,8 +624,7 @@ class AutographClear(Operator):
         However, there is no way to pool a grease-pencil stroke _while_ it is been
         written - its length is always "0" even though writting is underway.
 
-        So we have to resort to explictly calling the autograph dance button
-        on the pannel when writing is over.
+        the timeout is then increased so that at the writer is not interrupted mid-word.
 
         """
         # return False
@@ -582,7 +641,7 @@ class AutographClear(Operator):
 
             return False
 
-        if time.time() - self.check_write_time > STOPPED_WRITTING_TIMEOUT:
+        if len(strokes) >= 1 and (time.time() - self.check_write_time) > STOPPED_WRITTING_TIMEOUT:
             if pyautogui:
                 pyautogui.press("escape")
                 autograph(context)
