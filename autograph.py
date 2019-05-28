@@ -4,6 +4,7 @@ import threading, time
 
 from collections import namedtuple
 from contextlib import contextmanager
+from itertools import islice
 
 import bpy
 from bpy.props import StringProperty, PointerProperty, BoolProperty
@@ -13,6 +14,8 @@ import flipper
 
 
 AUTOGRAPH_PHRASE = "escrever com o corpo"
+
+INTENSITIES_TABLE_URL = "https://docs.google.com/spreadsheets/d/1R-GADr8HBUqiawQVrBgW_0_h-9bJMXO1kdI7qs9It3g/export?format=csv"
 
 SPACE_MARGIN = 2
 
@@ -490,8 +493,13 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
     for action_data in action_list:
         action_name = action_data["name"]
         frames_str = action_data.get("frames")
+        reverse_movement = False
         if frames_str.strip():
             frames = [int(v.strip()) for v in frames_str.split("-")]
+            frame_start, frame_end = frames
+            if frame_start < frame_end:
+                reverse_movement = True
+                frame_start, frame_end = frame_end, frame_start
         else:
             frames = None
 
@@ -506,9 +514,20 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
 
         def adjust_next_action(action, x_offset, frames):
             root_x_curve  = get_root_x_curve(action)
-            for point in root_x_curve.keyframe_points:
+            if reverse_movement:
+                x_offset -= root_x_curve.keyframe_points[frames[1]].co[1]
+
+            if not frames:
+                frames = None, None
+
+            for point in islice(root_x_curve.keyframe_points, *frames):
                 point.co[1] += x_offset
-            return point.co[1]
+
+            if not reverse_movement:
+                return point.co[1]
+            # If the strip is reversed, return the x coordinat of the first frame
+            # (which is the last one used in the strip)
+            return root_x_curve.keyframe_points[frames[0]].co[1]
 
         x_offset = adjust_next_action(new_action, x_offset, frames)
         try:
@@ -519,9 +538,14 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             continue
         total_actions += 1
         if frames:
+            if reverse_movement:
+                strip.use_reverse = True
+
+
+            # frames[x] position is regardless of using the strip in reverse
             strip.action_frame_start = frames[0]
             strip.action_frame_end = frames[1]
-            total_frames = frames[1] - frames[0]
+            total_frames = frame_end - frame_start
             # there might be flips
             flips = flipper.find_flips(new_action, frames[0], frames[1] + 1)
             if flips:
