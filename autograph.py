@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, re
 import random
 import threading, time
 
@@ -427,6 +427,36 @@ def get_final_x_location(action):
     return points[-1].co
 
 
+def _normalize_name(name):
+    name = name.lower().strip()
+    name = re.sub(r"[^a-zA-Z0-9#_]", "_", name)
+    while "__" in name:
+        name = name.replace("__", "_")
+    return name
+
+def _normalized_list(keys):
+    result = {}
+    for key in keys:
+        result.setdefault(_normalize_name(key), []).append(key)
+    return result
+
+_NORMALIZED_ACTIONS = None
+
+def get_action(name):
+    global _NORMALIZED_ACTIONS
+    if not _NORMALIZED_ACTIONS:
+        _NORMALIZED_ACTIONS = _normalized_list(bpy.data.actions.keys())
+    if name in bpy.data.actions:
+        return bpy.data.actions[name]
+    n_name = _normalize_name(name)
+    if n_name in _NORMALIZED_ACTIONS:
+        res = _NORMALIZED_ACTIONS[n_name]
+        if len(n_name) > 1:
+            print("Using ambiguous action name {}. Options are {}".format(name, res))
+        return res[0]
+    raise KeyError(name)
+
+
 def assemble_actions(context, phrase, phrase_data=None, number_written_letters=len(AUTOGRAPH_PHRASE)):
 
     # Insert space actions at start and end of text to be danced:
@@ -466,8 +496,8 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             frames = None
 
         try:
-            action = bpy.data.actions[action_name]
-        except Exception as error:
+            action = get_action(action_name)
+        except KeyError as error:
             print("Expected action not found: ",  action_name)
             continue
         new_action = action.copy()
