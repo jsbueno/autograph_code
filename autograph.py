@@ -481,7 +481,12 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             return point.co[1]
 
         x_offset = adjust_next_action(new_action, x_offset, frames)
-        strip = track.strips.new(action.name, previous_end, new_action)
+        try:
+            strip = track.strips.new(action.name, previous_end, new_action)
+        except RunTimeError as error:
+            # print(error)
+            print("Ignoring unknown runtime error for action {}. Skipping letter {}".format(action_name, action_data["letter"]))
+            continue
         total_actions += 1
         if frames:
             strip.action_frame_start = frames[0]
