@@ -472,7 +472,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             continue
         new_action = action.copy()
 
-        new_action.name = "temp_" + action_name
+        new_action.name = "temp__{}__{}".format(action_data["letter"], action_name)
 
         def adjust_next_action(action, x_offset, frames):
             root_x_curve  = get_root_x_curve(action)
@@ -602,10 +602,10 @@ class AutographClear(Operator):
         print("Writting started")
         self.writting_started = True
         self.modal_func = self.check_writting_ended
-        gp_layer.line_change = 10
+        gp_layer.line_change = -1
         gp_layer.tint_color = POST_WRITTING_COLOR
         gp_layer.tint_factor = 1.0
-        bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].line_change = 10
+        bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].line_change = -1
 
         bpy.data.grease_pencil["GPencil"].palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
 
