@@ -18,7 +18,8 @@ AUTOGRAPH_PHRASE = "escrever com o corpo"
 
 INTENSITIES_TABLE_URL = "https://docs.google.com/spreadsheets/d/1R-GADr8HBUqiawQVrBgW_0_h-9bJMXO1kdI7qs9It3g/export?format=csv"
 
-SPACE_MARGIN = 3
+SPACE_MARGIN_START = 0
+SPACE_MARGIN_END = 3
 
 START_WRITTING_TIMEOUT = 15
 STOPPED_WRITTING_TIMEOUT = 6
@@ -518,10 +519,15 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
     # autograph.hide = False
 
     # Insert space actions at start and end of text to be danced:
-    phrase = "{spaces}{phrase}{spaces}".format(phrase=phrase[:number_written_letters], spaces=" " * SPACE_MARGIN)
+    phrase = "{spaces_start}{phrase}{spaces_end}".format(
+        phrase=phrase[:number_written_letters],
+        spaces_start=" " * SPACE_MARGIN_START,
+        spaces_end=" " * SPACE_MARGIN_END
+    )
     if phrase_data:
-        for i in range(SPACE_MARGIN):
+        for i in range(SPACE_MARGIN_START):
             phrase_data.insert(0, phrase_data[0])
+        for i in range(SPACE_MARGIN_END):
             phrase_data.append(phrase_data[-1])
 
     action_list = get_action_names(phrase, phrase_data)
