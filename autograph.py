@@ -566,7 +566,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             strip = track.strips.new(new_action.name, previous_end, new_action)
         except RuntimeError as error:
             # print(error)
-            print("Ignoring unknown runtime error for action {}. Skipping letter {}".format(action_name, action_data["letter"]))
+            print("Ignoring unknown runtime error for action {}. Skipping letter {}\n\n{}".format(action_name, action_data["letter"], error))
             continue
         total_actions += 1
         if frames:
