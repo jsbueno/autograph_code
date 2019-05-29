@@ -11,13 +11,14 @@ from bpy.props import StringProperty, PointerProperty, BoolProperty
 from bpy.types import Panel, Operator, PropertyGroup
 
 import flipper
+import parameter_reader
 
 
 AUTOGRAPH_PHRASE = "escrever com o corpo"
 
 INTENSITIES_TABLE_URL = "https://docs.google.com/spreadsheets/d/1R-GADr8HBUqiawQVrBgW_0_h-9bJMXO1kdI7qs9It3g/export?format=csv"
 
-SPACE_MARGIN = 2
+SPACE_MARGIN = 1
 
 START_WRITTING_TIMEOUT = 15
 STOPPED_WRITTING_TIMEOUT = 6
@@ -33,7 +34,7 @@ ACTION_SPACING = 15
 ROOT_X_NAME = """pose.bones["pelvis"].location"""
 
 from autograph_action_data import data as ACTION_DATA
-
+FROZEN_ACTION_DATA = ACTION_DATA
 
 def autograph_path():
     """Enable 3rd party Python modules installed in an
@@ -225,6 +226,7 @@ def autograph(context):
     layer, and use those to select the proper actions to be
     associated with the main Autograph actor.
     """
+    global ACTION_DATA
 
     try:
         strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
@@ -251,6 +253,15 @@ def autograph(context):
     phrase_data = [{'pressure': p, 'speed': sp} for p, sp in zip(pressure_per_letter, speed_per_letter)]
 
     # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
+
+    try:
+        print("Downloading ACTION DATA from {}".format(INTENSITIES_TABLE_URL))
+        ACTION_DATA = parameter_reader.get_online_actions(INTENSITIES_TABLE_URL)
+    except RuntimeError as error:
+        print(error)
+        print("Failed refreshing online ACTION_DATA")
+    else:
+        print("Ok")
 
     autograph_ignite(context, phrase_data, number_written_letters)
 
@@ -454,10 +465,49 @@ def get_action(name):
     n_name = _normalize_name(name)
     if n_name in _NORMALIZED_ACTIONS:
         res = _NORMALIZED_ACTIONS[n_name]
-        if len(n_name) > 1:
+        if len(res) > 1:
             print("Using ambiguous action name {}. Options are {}".format(name, res))
         return res[0]
     raise KeyError(name)
+
+
+def adjust_next_action(action, x_offset, frames, reverse_movement):
+    """
+    Adds x-offset to action copy composing dance.
+    Returns offset of final frame in action
+
+    reverse_movement means the frames within the action will be
+    used in reverse order by the NLA
+    """
+    root_x_curve  = get_root_x_curve(action)
+    if reverse_movement:
+        x_offset -= root_x_curve.keyframe_points[frames[1]].co[1]
+    elif frames:
+        x_offset -= root_x_curve.keyframe_points[frames[0]].co[1]
+
+    for point in root_x_curve.keyframe_points:
+        point.co[1] += x_offset
+
+    if not frames:
+        return point.co[1]
+
+    last_x_position = frames[1] if not reverse_movement else frames[0]
+    return root_x_curve.keyframe_points[last_x_position].co[1]
+
+    # Alternative attempt: modify only points in curve that are to be used:
+
+    #if not frames:
+        #frames = None, None
+    #else:
+        #frames = list(frames)
+        #frames[1] += 1
+
+    #for point in islice(root_x_curve.keyframe_points, *frames):
+        #point.co[1] += x_offset
+
+    #if frames[0] is not None:
+        #root_x_curve.keyframe_points[0].co[1] = root_x_curve.keyframe_points[frames[0]].co[1]
+        #root_x_curve.keyframe_points[-1].co[1] = root_x_curve.keyframe_points[frames[1] - 1].co[1]
 
 
 def assemble_actions(context, phrase, phrase_data=None, number_written_letters=len(AUTOGRAPH_PHRASE)):
@@ -469,7 +519,6 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
         for i in range(SPACE_MARGIN):
             phrase_data.insert(0, phrase_data[0])
             phrase_data.append(phrase_data[-1])
-
 
     action_list = get_action_names(phrase, phrase_data)
 
@@ -497,7 +546,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
         if frames_str.strip():
             frames = [int(v.strip()) for v in frames_str.split("-")]
             frame_start, frame_end = frames
-            if frame_start < frame_end:
+            if frame_start > frame_end:
                 reverse_movement = True
                 frame_start, frame_end = frame_end, frame_start
         else:
@@ -512,26 +561,9 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
 
         new_action.name = "temp__{}__{}".format(action_data["letter"], action_name)
 
-        def adjust_next_action(action, x_offset, frames):
-            root_x_curve  = get_root_x_curve(action)
-            if reverse_movement:
-                x_offset -= root_x_curve.keyframe_points[frames[1]].co[1]
-
-            if not frames:
-                frames = None, None
-
-            for point in islice(root_x_curve.keyframe_points, *frames):
-                point.co[1] += x_offset
-
-            if not reverse_movement:
-                return point.co[1]
-            # If the strip is reversed, return the x coordinat of the first frame
-            # (which is the last one used in the strip)
-            return root_x_curve.keyframe_points[frames[0]].co[1]
-
-        x_offset = adjust_next_action(new_action, x_offset, frames)
+        x_offset = adjust_next_action(new_action, x_offset, frames, reverse_movement)
         try:
-            strip = track.strips.new(action.name, previous_end, new_action)
+            strip = track.strips.new(new_action.name, previous_end, new_action)
         except RuntimeError as error:
             # print(error)
             print("Ignoring unknown runtime error for action {}. Skipping letter {}".format(action_name, action_data["letter"]))
@@ -541,15 +573,13 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             if reverse_movement:
                 strip.use_reverse = True
 
-
-            # frames[x] position is regardless of using the strip in reverse
-            strip.action_frame_start = frames[0]
-            strip.action_frame_end = frames[1]
+            strip.action_frame_start = frame_start
+            strip.action_frame_end = frame_end
             total_frames = frame_end - frame_start
             # there might be flips
-            flips = flipper.find_flips(new_action, frames[0], frames[1] + 1)
+            flips = flipper.find_flips(new_action, frame_start, frame_end + 1)
             if flips:
-                flipper.invert_flips(new_action, flips, frames[0], frames[1] + 1)
+                flipper.invert_flips(new_action, flips, frame_start, frame_end + 1)
         else:
             total_frames = new_action.frame_range[1]
         strip.select = False

@@ -4,13 +4,15 @@ in the autograph project, and outputs it as Python data
 that can be incorporated in the Autograph scripts
 
 
-TODO: Read the spreadsheet data directly from within
-the Autograph main script.
-
 """
 
 import csv
+import http.client
+import io
+import sys
+
 from pathlib import Path
+
 
 # Filename bellow is as exported by the spreadsheet where each
 # action sequence is paramterized by the artistic author.
@@ -18,8 +20,8 @@ from pathlib import Path
 
 csv_path = "AUTOGRAPH TABELA INTENSIDADES - repertorio.csv"
 
-def get_data_from_csv_file(csv_file):
-    headers = "name speed pressure direction size old_frames letter_notes letter frames".split()
+def get_data_from_csv(csv_file):
+    headers = "name speed pressure direction size old_frames letter_notes letter frames selected".split()
 
     raw_data = list(csv.reader(csv_file))
     # Skip spreadsheet header rows:
@@ -54,5 +56,27 @@ def write_static_file(data, path="autograph_action_data.py"):
     Path(path).write_text("data = \\\n" + pformat(data))
 
 
+def download_intensity_table(url):
+    host = url.split("//")[1].split("/")[0]
+    error = False
+    try:
+        x = http.client.HTTPSConnection(host, timeout=4)
+        x.request("GET", url)
+        y = x.getresponse()
+    except OSError as error:
+        print(error, file=sys.stderr)
+        error = True
+    if y.status != 200 or error:
+        raise RuntimeError("Could not get online data")
+    zz = io.TextIOWrapper(y, encoding="utf-8")
+    return zz
+
+
+def get_online_actions(url):
+    csv_data = download_intensity_table(url)
+    action_data = get_data_from_csv(csv_data)
+    return action_data
+
+
 if __name__ == "__main__":
-    write_static_file(get_data_from_csv_file(Path(csv_path).open()))
+    write_static_file(get_data_from_csv(Path(csv_path).open()))
