@@ -36,6 +36,8 @@ ROOT_X_NAME = """pose.bones["pelvis"].location"""
 from autograph_action_data import data as ACTION_DATA
 FROZEN_ACTION_DATA = ACTION_DATA
 
+WRITTING_FADE_FRAME = 90
+
 def autograph_path():
     """Enable 3rd party Python modules installed in an
     active Virtualenv when Python is run.
@@ -306,7 +308,7 @@ def autograph_ignite(context, phrase_data, number_written_letters):
     """
     total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data, number_written_letters)
     context.scene.frame_end = total_frames
-
+    fade_text()
     bpy.ops.screen.animation_play()
 
 
@@ -512,8 +514,10 @@ def adjust_next_action(action, x_offset, frames, reverse_movement):
 
 def assemble_actions(context, phrase, phrase_data=None, number_written_letters=len(AUTOGRAPH_PHRASE)):
 
-    # Insert space actions at start and end of text to be danced:
+    autograph = bpy.data.objects[AUTOGRAPH_ID]
+    # autograph.hide = False
 
+    # Insert space actions at start and end of text to be danced:
     phrase = "{spaces}{phrase}{spaces}".format(phrase=phrase[:number_written_letters], spaces=" " * SPACE_MARGIN)
     if phrase_data:
         for i in range(SPACE_MARGIN):
@@ -521,8 +525,6 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             phrase_data.append(phrase_data[-1])
 
     action_list = get_action_names(phrase, phrase_data)
-
-    autograph = bpy.data.objects[AUTOGRAPH_ID]
 
     track_name =  AUTOGRAPH_ID.lower() + "_dance"
     try:
@@ -592,6 +594,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
 
     _add_transitions(context, track, total_actions)
     camera_setup(x_offset)
+    # autograph.hide = True
 
     return previous_end - ACTION_SPACING
 
@@ -607,7 +610,7 @@ def camera_setup(max_x):
 def _add_transitions(context, track, total_actions):
         if total_actions <= 1:
             return
-        with switch_context_area(context, "NLA_EDITOR"), activate_layer(context, ARMATURE_LAYER):
+        with switch_context_area(context, "NLA_EDITOR"):
             bpy.ops.nla.selected_objects_add()
             track.select = True
             bpy.ops.nla.select_all_toggle(True)
@@ -615,10 +618,22 @@ def _add_transitions(context, track, total_actions):
 
 
 def autograph_test(context):
-    total_frames = assemble_actions(context, AUTOGRAPH_PHRASE)
+    with activate_layer(context, ARMATURE_LAYER):
+        total_frames = assemble_actions(context, AUTOGRAPH_PHRASE)
     context.scene.frame_end = total_frames
 
     bpy.ops.screen.animation_play()
+
+
+def fade_text():
+    grease = bpy.data.grease_pencil["GPencil"]
+    grease.animation_data_create()
+    act = bpy.data.actions.new("GPencil.001Action")
+    grease.animation_data.action = act
+    curve = act.fcurves.new(data_path="""palettes["GP_Palette"].colors["Color"].alpha""")
+
+    curve.keyframe_points.insert(1, 1)
+    curve.keyframe_points.insert(WRITTING_FADE_FRAME, 0)
 
 
 class Autograph(Operator):
