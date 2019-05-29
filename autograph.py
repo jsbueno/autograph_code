@@ -586,20 +586,23 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
         previous_end += total_frames + ACTION_SPACING
         prev_action = new_action
 
-
     previous_strip = None
 
     context.scene.objects.active = autograph
 
-    if total_actions > 1:
+    _add_transitions(context, track, total_actions)
+
+    return previous_end - ACTION_SPACING
+
+
+def _add_transitions(context, track, total_actions):
+        if total_actions <= 1:
+            return
         with switch_context_area(context, "NLA_EDITOR"), activate_layer(context, ARMATURE_LAYER):
             bpy.ops.nla.selected_objects_add()
             track.select = True
             bpy.ops.nla.select_all_toggle(True)
             bpy.ops.nla.transition_add()
-
-    return previous_end - ACTION_SPACING
-
 
 
 def autograph_test(context):
