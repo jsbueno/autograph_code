@@ -241,9 +241,8 @@ def autograph(context):
     average_points_per_letter = 42
 
     size_counter = 0
-    tmp_size_max, tmp_size_min = 0, 1000
+    tmp_size_max, tmp_size_min = -1000, 1000
 
-    breakpoint()
     for word, stroke in strokes.items():
         for i, point in stroke.points.items():
             if i == 0:
@@ -252,25 +251,29 @@ def autograph(context):
             pressure.append(point.pressure)
             speed.append((point.co - previous.co).magnitude)
             previous = point
-            if point.co[1] > tmp_size_max:
-                tmp_size_max = point.co[1]
-            if point.co[1] < tmp_size_min:
-                tmp_size_min = point.co[1]
+            z = point.co[2]
+            if z > tmp_size_max:
+                tmp_size_max = z
+            if z < tmp_size_min:
+                tmp_size_min = z
 
             size_counter += 1
             if size_counter > average_points_per_letter:
-                size.append(tmp_size_max - tmp_size_min)
-                tmp_size_max, tmp_size_min = 1000, 0
+                size.extend([tmp_size_max - tmp_size_min] * size_counter)
+                tmp_size_max, tmp_size_min = -1000, 1000
                 size_counter = 0
+
+    if size_counter:
+        size.extend([tmp_size_max - tmp_size_min] * size_counter)
 
     number_written_letters = guess_written_phrase_size(strokes, speed)
 
     pressure_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, pressure, [0.3, 1.0], number_written_letters)
     speed_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, speed, [0.02, 0.08], number_written_letters)
 
-    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0, 1], number_written_letters)
+    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0.15, 2.2], number_written_letters)
 
-    phrase_data = [{'pressure': p, 'speed': sp} for p, sp in zip(pressure_per_letter, speed_per_letter)]
+    phrase_data = [{'pressure': p, 'speed': sp, 'size': size} for p, sp, size in zip(pressure_per_letter, speed_per_letter, size_per_letter)]
 
     # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
 
@@ -387,19 +390,21 @@ def get_best_action(letter, letter_data):
 
     """
 
-    Features = namedtuple("Features", "pressure speed")
+    Features = namedtuple("Features", "pressure speed size")
 
     pressure = letter_data.get("pressure", 0.5) * 10
     speed = letter_data.get("speed", 0.5) * 10
+    size = letter_data.get("size", 0.5) * 10
 
-    feature_vector = Features(pressure, speed)
+    feature_vector = Features(pressure, speed, size)
 
     plain_actions = ACTION_DATA[letter]
     indexed_actions = {}
     for action in plain_actions:
         pressure = _get_int_or_default(action, "pressure")
         speed = _get_int_or_default(action, "speed")
-        indexed_actions[Features(pressure, speed)] = action
+        size = _get_int_or_default(action, "size")
+        indexed_actions[Features(pressure, speed, size)] = action
 
     def proximity(item):
         nonlocal feature_vector
