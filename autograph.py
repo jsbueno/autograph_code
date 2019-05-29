@@ -18,7 +18,7 @@ AUTOGRAPH_PHRASE = "escrever com o corpo"
 
 INTENSITIES_TABLE_URL = "https://docs.google.com/spreadsheets/d/1R-GADr8HBUqiawQVrBgW_0_h-9bJMXO1kdI7qs9It3g/export?format=csv"
 
-SPACE_MARGIN = 1
+SPACE_MARGIN = 3
 
 START_WRITTING_TIMEOUT = 15
 STOPPED_WRITTING_TIMEOUT = 6
@@ -560,7 +560,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
         new_action = action.copy()
 
         new_action.name = "temp__{}__{}".format(action_data["letter"], action_name)
-
+        print("{}: , x_offset: {}".format(new_action.name, x_offset))
         x_offset = adjust_next_action(new_action, x_offset, frames, reverse_movement)
         try:
             strip = track.strips.new(new_action.name, previous_end, new_action)
@@ -591,8 +591,17 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
     context.scene.objects.active = autograph
 
     _add_transitions(context, track, total_actions)
+    camera_setup(x_offset)
 
     return previous_end - ACTION_SPACING
+
+
+def camera_setup(max_x):
+    print("final x_offset", max_x)
+    camera = bpy.data.objects["Camera"]
+    camera.location[0] = -max_x / 2
+    camera.location[1] = min(-4, max_x * 1.1)
+    camera.location[2] = 1
 
 
 def _add_transitions(context, track, total_actions):
@@ -697,9 +706,11 @@ class AutographClear(Operator):
         gp_layer.line_change = -1
         gp_layer.tint_color = POST_WRITTING_COLOR
         gp_layer.tint_factor = 1.0
-        bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].line_change = -1
+        grease = bpy.data.grease_pencil["GPencil"]
+        grease.layers["GP_Layer"].line_change = -1
+        grease.layers["GP_Layer"].parent = bpy.data.objects["Camera"]
 
-        bpy.data.grease_pencil["GPencil"].palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
+        grease.palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
 
         self.check_write_strokes = 0
         self.check_write_points = 0
