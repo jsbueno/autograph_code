@@ -237,8 +237,13 @@ def autograph(context):
         print("Can't start: No grease pencil writting found on scene.")
         return
 
-    speed = []; pressure = []
+    speed = []; pressure = []; size = []
+    average_points_per_letter = 42
 
+    size_counter = 0
+    tmp_size_max, tmp_size_min = 0, 1000
+
+    breakpoint()
     for word, stroke in strokes.items():
         for i, point in stroke.points.items():
             if i == 0:
@@ -247,11 +252,23 @@ def autograph(context):
             pressure.append(point.pressure)
             speed.append((point.co - previous.co).magnitude)
             previous = point
+            if point.co[1] > tmp_size_max:
+                tmp_size_max = point.co[1]
+            if point.co[1] < tmp_size_min:
+                tmp_size_min = point.co[1]
+
+            size_counter += 1
+            if size_counter > average_points_per_letter:
+                size.append(tmp_size_max - tmp_size_min)
+                tmp_size_max, tmp_size_min = 1000, 0
+                size_counter = 0
 
     number_written_letters = guess_written_phrase_size(strokes, speed)
 
     pressure_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, pressure, [0.3, 1.0], number_written_letters)
     speed_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, speed, [0.02, 0.08], number_written_letters)
+
+    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0, 1], number_written_letters)
 
     phrase_data = [{'pressure': p, 'speed': sp} for p, sp in zip(pressure_per_letter, speed_per_letter)]
 
