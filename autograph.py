@@ -467,7 +467,7 @@ def get_action(name):
         res = _NORMALIZED_ACTIONS[n_name]
         if len(res) > 1:
             print("Using ambiguous action name {}. Options are {}".format(name, res))
-        return res[0]
+        return bpy.data.actions[res[0]]
     raise KeyError(name)
 
 
