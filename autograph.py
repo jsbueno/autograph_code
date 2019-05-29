@@ -328,6 +328,7 @@ def autograph_ignite(context, phrase_data, number_written_letters):
 
     """
     total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data, number_written_letters)
+    context.scene.frame_start = 1
     context.scene.frame_end = total_frames
     fade_text()
     bpy.ops.screen.animation_play()
