@@ -242,7 +242,7 @@ def autograph(context):
         print("Can't start: No grease pencil writting found on scene.")
         return
 
-    speed = []; pressure = []; size = []
+    speed = []; pressure = []; size = []; psize = []
     average_points_per_letter = 42
 
     size_counter = 0
@@ -265,8 +265,11 @@ def autograph(context):
             size_counter += 1
             if size_counter > average_points_per_letter:
                 size.extend([tmp_size_max - tmp_size_min] * size_counter)
+                psize.append(tmp_size_max - tmp_size_min)
                 tmp_size_max, tmp_size_min = -1000, 1000
                 size_counter = 0
+
+    print("MEASURED SIZES", psize)
 
     if size_counter:
         size.extend([tmp_size_max - tmp_size_min] * size_counter)
@@ -280,7 +283,15 @@ def autograph(context):
 
     phrase_data = [{'pressure': p, 'speed': sp, 'size': size} for p, sp, size in zip(pressure_per_letter, speed_per_letter, size_per_letter)]
 
-    print("pressure data: \n", )
+    def _format_list(lst):
+        return "[{}]".format(", ".join("{:0.3f}".format(el) for el in lst ))
+
+    print("pressure data:  \n size: {sizes}\n, pressures: {pressures}\n, speed: {speeds}\n".format(
+            pressures=_format_list(pressure_per_letter),
+            sizes = _format_list(size_per_letter),
+            speeds = _format_list(speed_per_letter)
+        )
+    )
 
     # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
 
@@ -427,10 +438,9 @@ def get_best_action(letter, letter_data, isolate_actions):
         return distance
 
     sorted_actions = sorted(indexed_actions.items(), key=proximity)
-    print("**" * 50, feature_vector, sorted_actions)
 
-    # print(f"**** {letter} - {feature_vector} : {sorted_actions}")
     if sorted_actions:
+        print("**" * 50, "\n", letter, feature_vector, sorted_actions, "\n", "##" * 50)
         return sorted_actions[0][1]
     return None
 
