@@ -149,7 +149,10 @@ def activate_layer(context, layer):
     context.scene.layers[layer] = original_value
 
 
-def average_value_per_letter(phrase, measured_points, normalize=(0, 1), number_written_letters=len(AUTOGRAPH_PHRASE)):
+def average_value_per_letter(
+    phrase, measured_points, normalize=(0, 1),
+    number_written_letters=len(AUTOGRAPH_PHRASE)
+):
     """Re-sample measurements according to the number of
     letters expcted in the writting.
 
@@ -515,6 +518,11 @@ def adjust_next_action(action, x_offset, frames, reverse_movement):
     used in reverse order by the NLA
     """
     root_x_curve  = get_root_x_curve(action)
+    if frames:
+        if frames[0] <= 1:
+            frames[0] = 1
+        if frames[1] >= len(root_x_curve.keyframe_points):
+            frames[1] = len(root_x_curve.keyframe_points) - 1
     if reverse_movement:
         x_offset -= root_x_curve.keyframe_points[frames[1]].co[1]
     elif frames:
