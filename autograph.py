@@ -165,7 +165,8 @@ def average_value_per_letter(phrase, measured_points, normalize=(0, 1), number_w
     """
     phrase = phrase[:number_written_letters]
     trimmed_phrase = phrase.replace(" ", "")
-    factor = len(measured_points) / len(trimmed_phrase)
+    text_length = len(trimmed_phrase)
+    factor = len(measured_points) / (text_length or 1)
     if factor < 1:
         return measured_points
     new_points = []
