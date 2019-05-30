@@ -15,6 +15,7 @@ import parameter_reader
 
 
 AUTOGRAPH_PHRASE = "escrever com o corpo"
+AUTOGRAPH_ORIGINAL_PHRASE = AUTOGRAPH_PHRASE
 
 INTENSITIES_TABLE_URL = "https://docs.google.com/spreadsheets/d/1R-GADr8HBUqiawQVrBgW_0_h-9bJMXO1kdI7qs9It3g/export?format=csv"
 
@@ -669,7 +670,7 @@ class Autograph(Operator):
     """Launch Dance Action"""
 
     bl_idname = "add.autograph"
-    bl_label = "Autograph"
+    bl_label = "Reproduzir último"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -695,7 +696,7 @@ class AutographClear(Operator):
     """Clear Grease Writting"""
 
     bl_idname = "clear.autograph"
-    bl_label = "Limpar escrita"
+    bl_label = "AUTOGRAPH"
     bl_options = {'REGISTER', 'UNDO'}
 
     _timer = None
@@ -806,6 +807,23 @@ class AutographClear(Operator):
         return {"PASS_THROUGH"}
 
 
+
+class AutographText(bpy.types.PropertyGroup):
+
+    def update_text_parameter(self, context):
+        global AUTOGRAPH_PHRASE
+        AUTOGRAPH_PHRASE = self.text
+        print("Phrase changed to '{}'".format(self.text))
+
+    text = bpy.props.StringProperty(
+        default=AUTOGRAPH_ORIGINAL_PHRASE,
+        name="text",
+        description="Texto que será dançado",
+        update=update_text_parameter
+    )
+
+
+
 class AutographPanel(Panel):
     """Creates a Panel in the scene context of the properties editor"""
     bl_label = "Autograph v.%d.%d.%d" % bl_info['version']
@@ -822,16 +840,18 @@ class AutographPanel(Panel):
 
         layout.label(text="AUTOGRAPH")
         row = layout.row()
+        row.operator("clear.autograph")
+        row.scale_y = 3.0
+        row = layout.row()
         row.operator("add.autograph")
         row = layout.row()
-        row.operator("clear.autograph")
-        row = layout.row()
-        row.operator("test.autograph")
+        row.prop(scene.autograph_text, "text", text="Texto")
 
 
 def register():
     print("Registering Autograph add-on")
     bpy.utils.register_module(__name__)
+    bpy.types.Scene.autograph_text = bpy.props.PointerProperty(type=AutographText)
 
 
 def unregister():
