@@ -280,6 +280,8 @@ def autograph(context):
 
     phrase_data = [{'pressure': p, 'speed': sp, 'size': size} for p, sp, size in zip(pressure_per_letter, speed_per_letter, size_per_letter)]
 
+    print("pressure data: \n", )
+
     # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
 
     try:
@@ -425,6 +427,7 @@ def get_best_action(letter, letter_data, isolate_actions):
         return distance
 
     sorted_actions = sorted(indexed_actions.items(), key=proximity)
+    print("**" * 50, feature_vector, sorted_actions)
 
     # print(f"**** {letter} - {feature_vector} : {sorted_actions}")
     if sorted_actions:
