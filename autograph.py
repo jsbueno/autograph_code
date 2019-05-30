@@ -382,7 +382,7 @@ def _get_int_or_default(dct, key, default=5):
     return int(value) if value.isdigit() else default
 
 
-def get_best_action(letter, letter_data):
+def get_best_action(letter, letter_data, isolate_actions):
     """Given features of choice, uses a vector space based
     on the mark for each of the features, and find the smallest
     distance of an action to the parameters of the current glyph
@@ -403,6 +403,8 @@ def get_best_action(letter, letter_data):
     plain_actions = ACTION_DATA[letter]
     indexed_actions = {}
     for action in plain_actions:
+        if isolate_actions and not action.get("selected", "").strip():
+            continue
         pressure = _get_int_or_default(action, "pressure")
         speed = _get_int_or_default(action, "speed")
         size = _get_int_or_default(action, "size")
@@ -429,6 +431,7 @@ def get_best_action(letter, letter_data):
 
 def get_action_names(phrase, phrase_data):
     actions = []
+    isolate_actions = bpy.context.scene.autograph_text.isolate_actions
     if not phrase_data:
         phrase_data = map(lambda x: {}, phrase)
     for letter, letter_data in zip(phrase, phrase_data):
@@ -437,11 +440,15 @@ def get_action_names(phrase, phrase_data):
             # phrase, just skip it.
             print("Could not find action for {letter!r} ".format(letter=letter))
             continue
-        action = get_best_action(letter, letter_data)
-        if not action:
+        action = get_best_action(letter, letter_data, isolate_actions)
 
-            print("Could not match a good action for {letter!r} - picking random action".format(letter=letter))
-            action = random.choice(ACTION_DATA[letter])
+        if not action:
+            if not isolate_actions:
+                print("Could not match a good action for {letter!r} - picking random action".format(letter=letter))
+                action = random.choice(ACTION_DATA[letter])
+            else:
+                print("Letter '{}' not selected in spreadsheet - skipped".format(letter))
+                continue
         actions.append(action)
     print(actions)
     return actions
@@ -822,6 +829,12 @@ class AutographText(bpy.types.PropertyGroup):
         update=update_text_parameter
     )
 
+    isolate_actions = bpy.props.BoolProperty(
+        default=False,
+        name="isolate_actions",
+        description="Usar somente ações selecionadas",
+    )
+
 
 
 class AutographPanel(Panel):
@@ -846,6 +859,8 @@ class AutographPanel(Panel):
         row.operator("add.autograph")
         row = layout.row()
         row.prop(scene.autograph_text, "text", text="Texto")
+        row = layout.row()
+        row.prop(scene.autograph_text, "isolate_actions", text="Isolar ações")
 
 
 def register():
