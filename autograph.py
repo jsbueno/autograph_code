@@ -306,7 +306,7 @@ def autograph(context):
         # [context.scene.autograph_text.lower_speed, context.scene.autograph_text.upper_speed],
         number_written_letters)
 
-    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0.05, 1], number_written_letters)
+    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0.05, 0.5], number_written_letters)
 
     writting_time = context.scene.autograph_text.total_writting_time
     letter_per_time = number_written_letters / writting_time
