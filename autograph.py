@@ -80,7 +80,7 @@ bl_info = {
     # "location": "View3D > Tools > Autograph"
     "category": "Autograph",
     "author": "João S. O. Bueno",
-    "version": (0, 99, 0)
+    "version": (1, 0, 0)
 }
 
 
@@ -599,6 +599,11 @@ def adjust_next_action(action, x_offset, frames, reverse_movement):
         #root_x_curve.keyframe_points[0].co[1] = root_x_curve.keyframe_points[frames[0]].co[1]
         #root_x_curve.keyframe_points[-1].co[1] = root_x_curve.keyframe_points[frames[1] - 1].co[1]
 
+def convert_action_to_samples(action):
+    for curve in action.fcurves:
+        if len(curve.keyframe_points) > 1 and not len(curve.sampled_points):
+            curve.convert_to_samples(0, curve.keyframe_points[-1].co[0])
+
 
 def assemble_actions(context, phrase, phrase_data=None, number_written_letters=len(AUTOGRAPH_PHRASE)):
 
@@ -657,6 +662,9 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
         new_action.name = "temp__{}__{}".format(action_data["letter"], action_name)
         print("{}: , x_offset: {}".format(new_action.name, x_offset))
         x_offset = adjust_next_action(new_action, x_offset, frames, reverse_movement)
+
+        convert_action_to_samples(new_action)
+
         try:
             strip = track.strips.new(new_action.name, previous_end, new_action)
         except RuntimeError as error:
@@ -741,10 +749,10 @@ def fade_text():
     curve.keyframe_points.insert(WRITTING_FADE_FRAME, 0)
 
 
-class Autograph(Operator):
-    """Launch Dance Action"""
+class RepeatAutograph(Operator):
+    """Dança Novamente"""
 
-    bl_idname = "add.autograph"
+    bl_idname = "autograph.repeat"
     bl_label = "Reproduzir último"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -767,10 +775,10 @@ class AutographTest(Operator):
         return {'FINISHED'}
 
 
-class AutographClear(Operator):
-    """Clear Grease Writting"""
+class Autograph(Operator):
+    """Inicia Autograph"""
 
-    bl_idname = "clear.autograph"
+    bl_idname = "autograph.start"
     bl_label = "AUTOGRAPH"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -934,20 +942,20 @@ class AutographPanel(Panel):
 
         scene = context.scene
 
-        layout.label(text="AUTOGRAPH")
+        layout.label(text="")
         row = layout.row()
-        row.operator("clear.autograph")
+        row.operator("autograph.start")
         row.scale_y = 3.0
         row = layout.row()
-        row.operator("add.autograph")
+        row.operator("autograph.repeat")
         row = layout.row()
         row.prop(scene.autograph_text, "text", text="Texto")
         row = layout.row()
         row.prop(scene.autograph_text, "isolate_actions", text="Isolar ações")
-        row = layout.row()
-        row.prop(scene.autograph_text, "lower_speed", text="vel. baixo")
-        row = layout.row()
-        row.prop(scene.autograph_text, "upper_speed", text="vel. alto")
+        #row = layout.row()
+        #row.prop(scene.autograph_text, "lower_speed", text="vel. baixo")
+        #row = layout.row()
+        #row.prop(scene.autograph_text, "upper_speed", text="vel. alto")
 
 
 
