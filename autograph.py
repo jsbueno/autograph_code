@@ -689,8 +689,14 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             speed_factor = float(action_data.get("speed_factor", "1").strip())
         except ValueError:
             speed_factor = 1.0
+
+        action_spacing = ACTION_SPACING
         if letter_data["speed"] > 0.75:
-            speed_factor *= 1 / (1 + (letter_data["speed"] - 0.75) * 4)
+            superspeed = (letter_data["speed"] - 0.75) * 4
+            speed_factor *= 1 / (1 + superspeed)
+            action_spacing = int(ACTION_SPACING * 0.6 + 4 * (1 - superspeed))
+        elif letter_data["speed"] < 0.25:
+            action_spacing = int(ACTION_SPACING + 40 * (0.25 - max(0, letter_data["speed"])))
         if speed_factor != 1.0:
             print("{!r} using speed_factor {}".format(action_data["letter"], speed_factor))
             strip.scale = speed_factor
@@ -698,7 +704,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
         total_frames = strip.frame_end - strip.frame_start
 
         strip.select = False
-        previous_end += total_frames + ACTION_SPACING
+        previous_end += total_frames + action_spacing
         prev_action = new_action
 
     previous_strip = None
