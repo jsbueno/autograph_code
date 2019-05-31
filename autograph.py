@@ -1,6 +1,7 @@
 import os, sys, re
 import random
 import threading, time
+import statistics
 
 from collections import namedtuple
 from contextlib import contextmanager
@@ -84,6 +85,12 @@ bl_info = {
 
 
 def scene_cleanup(context):
+    """AKA: Nuclear Blast
+
+    removes all grease pencils, temporary actions, NLA tracks
+    and resets the camera position - everything ready
+    to a fresh text to be drawn.
+    """
 
     for grease in bpy.data.grease_pencil:
         bpy.data.grease_pencil.remove(grease)
@@ -107,6 +114,14 @@ def scene_cleanup(context):
     bpy.ops.screen.animation_cancel()
     bpy.context.scene.frame_current = 0
     # bpy.data.grease_pencil["GPencil"].palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
+    # Reset camera
+    # Camera reseting is important because grease-pencil coordinates
+    # used for size and speed calculations depend on absolute coordinates
+    bpy.data.objects["Camera"].location = (2, -4, 1)
+    for area in context.screen.areas:
+        if area.type == 'VIEW_3D':
+            area.spaces[0].region_3d.view_perspective = 'CAMERA'
+            break
 
 
 def cleanup_and_merge_speeds(v):
@@ -148,6 +163,9 @@ def activate_layer(context, layer):
     yield
     context.scene.layers[layer] = original_value
 
+def normalize_f(values, normalize):
+    factor =  1 / (normalize[1] - normalize[0])
+    return [(v - normalize[0]) * factor for v in values]
 
 def average_value_per_letter(
     phrase, measured_points, normalize=(0, 1),
@@ -173,21 +191,22 @@ def average_value_per_letter(
     if factor < 1:
         return measured_points
     new_points = []
-    norm_factor = 1 / (normalize[1] - normalize[0])
-    for i, letter in enumerate(phrase):
+    i = 0
+    for letter in phrase:
         if letter == " ":
             # for spaces, copy parameters from the previous drawn letter
             new_points.append(new_points[-1] if new_points else 0)
             continue
         points_value = sum(measured_points[int(i * factor): int((i + 1) * factor)]) / factor
-        points_value = (points_value - normalize[0]) * norm_factor
         new_points.append(points_value)
-    return new_points
+        i += 1
+    return normalize_f(new_points, normalize)
 
 
 def guess_written_phrase_size(strokes, speed):
 
     phrase = AUTOGRAPH_PHRASE
+    phrase = phrase.replace(" ", "")
 
     average_points_per_letter = 42
     minimal_points_per_letter = 22
@@ -225,6 +244,9 @@ def guess_written_phrase_size(strokes, speed):
 
     print("Assuming written text to be: {!r}".format(phrase[:result]))
     return result
+
+def _format_list(lst):
+    return "[{}]".format(", ".join("{:0.3f}".format(el) for el in lst ))
 
 
 def autograph(context):
@@ -269,22 +291,30 @@ def autograph(context):
                 tmp_size_max, tmp_size_min = -1000, 1000
                 size_counter = 0
 
-    print("MEASURED SIZES", psize)
+    print("MEASURED SIZES", _format_list(psize))
 
     if size_counter:
         size.extend([tmp_size_max - tmp_size_min] * size_counter)
 
+    # TODO: take in account letter size for "number_written_letters" -
+    # it is widelly innacurate for small text.
     number_written_letters = guess_written_phrase_size(strokes, speed)
 
     pressure_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, pressure, [0.3, 1.0], number_written_letters)
-    speed_per_letter = average_value_per_letter(AUTOGRAPH_PHRASE, speed, [0.02, 0.08], number_written_letters)
+    raw_speed_per_letter = average_value_per_letter(
+        AUTOGRAPH_PHRASE, speed, [0.1, 0.4],
+        # [context.scene.autograph_text.lower_speed, context.scene.autograph_text.upper_speed],
+        number_written_letters)
 
-    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0.15, 2.2], number_written_letters)
+    size_per_letter =  average_value_per_letter(AUTOGRAPH_PHRASE, size, [0.05, 1], number_written_letters)
 
-    phrase_data = [{'pressure': p, 'speed': sp, 'size': size} for p, sp, size in zip(pressure_per_letter, speed_per_letter, size_per_letter)]
+    writting_time = context.scene.autograph_text.total_writting_time
+    letter_per_time = number_written_letters / writting_time
+    speed_factor = letter_per_time / statistics.median(raw_speed_per_letter)
 
-    def _format_list(lst):
-        return "[{}]".format(", ".join("{:0.3f}".format(el) for el in lst ))
+    speed_per_letter = normalize_f([s * speed_factor for s in raw_speed_per_letter ], (0.7, 2.7))
+
+    phrase_data = [{'pressure': p, 'speed': sp, 'size': size} for p, sp, size in zip(pressure_per_letter, speed_per_letter,  size_per_letter)]
 
     print("pressure data:  \n size: {sizes}\n, pressures: {pressures}\n, speed: {speeds}\n".format(
             pressures=_format_list(pressure_per_letter),
@@ -292,8 +322,12 @@ def autograph(context):
             speeds = _format_list(speed_per_letter)
         )
     )
-
-    # print(f"\n\n\nSpeeds: {speed_per_letter}\n\npressures: {pressure_per_letter}")
+    print("raw_speeds:", _format_list(raw_speed_per_letter))
+    print("Total writting time: {:0.2f}, num. letters: {}".format(
+            writting_time,
+            number_written_letters
+        )
+    )
 
     try:
         print("Downloading ACTION DATA from {}".format(INTENSITIES_TABLE_URL))
@@ -440,7 +474,7 @@ def get_best_action(letter, letter_data, isolate_actions):
     sorted_actions = sorted(indexed_actions.items(), key=proximity)
 
     if sorted_actions:
-        print("**" * 50, "\n", letter, feature_vector, sorted_actions, "\n", "##" * 50)
+        # print("**" * 50, "\n", letter, feature_vector, sorted_actions, "\n", "##" * 50)
         return sorted_actions[0][1]
     return None
 
@@ -788,7 +822,7 @@ class AutographClear(Operator):
 
         self.check_write_strokes = 0
         self.check_write_points = 0
-        self.check_write_time = time.time()
+        self.start_writting_time = self.check_write_time = time.time()
         return False
 
     def check_writting_ended(self, context):
@@ -804,8 +838,6 @@ class AutographClear(Operator):
         the timeout is then increased so that at the writer is not interrupted mid-word.
 
         """
-        # return False
-
         try:
             strokes = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].active_frame.strokes
         except (IndexError, KeyError, AttributeError):
@@ -819,10 +851,12 @@ class AutographClear(Operator):
             return False
 
         if len(strokes) >= 1 and (time.time() - self.check_write_time) > STOPPED_WRITTING_TIMEOUT:
+            total_time = time.time() - self.start_writting_time - STOPPED_WRITTING_TIMEOUT
+            context.scene.autograph_text.total_writting_time = total_time
             if pyautogui:
                 pyautogui.press("escape")
                 autograph(context)
-                # pyautogui.press("t")
+
 
             return True
         return False
@@ -857,6 +891,21 @@ class AutographText(bpy.types.PropertyGroup):
         description="Usar somente ações selecionadas",
     )
 
+    lower_speed = bpy.props.FloatProperty(
+        default=0.004,
+        name="lower_speed",
+        description="valor inferior da limitacao da velocidade",
+    )
+    upper_speed = bpy.props.FloatProperty(
+        default=0.017,
+        name="uper_speed",
+        description="valor inferior da limitacao da velocidade",
+    )
+    total_writting_time = bpy.props.FloatProperty(
+        name="total_writting_time",
+        description="duração total da última escrita",
+    )
+
 
 
 class AutographPanel(Panel):
@@ -883,6 +932,11 @@ class AutographPanel(Panel):
         row.prop(scene.autograph_text, "text", text="Texto")
         row = layout.row()
         row.prop(scene.autograph_text, "isolate_actions", text="Isolar ações")
+        row = layout.row()
+        row.prop(scene.autograph_text, "lower_speed", text="vel. baixo")
+        row = layout.row()
+        row.prop(scene.autograph_text, "upper_speed", text="vel. alto")
+
 
 
 def register():
