@@ -500,7 +500,7 @@ def get_action_names(phrase, phrase_data):
             else:
                 print("Letter '{}' not selected in spreadsheet - skipped".format(letter))
                 continue
-        actions.append(action)
+        actions.append((action, letter_data))
     print(actions)
     return actions
 
@@ -634,7 +634,7 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
     prev_action = None
     x_offset = 0
     total_actions = 0
-    for action_data in action_list:
+    for (action_data, letter_data) in action_list:
         action_name = action_data["name"]
         frames_str = action_data.get("frames")
         reverse_movement = False
@@ -677,6 +677,18 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
                 flipper.invert_flips(new_action, flips, frame_start, frame_end + 1)
         else:
             total_frames = new_action.frame_range[1]
+        try:
+            speed_factor = float(action_data.get("speed_factor", "1").strip())
+        except ValueError:
+            speed_factor = 1.0
+        if letter_data["speed"] > 0.75:
+            speed_factor *= 1 / (1 + (letter_data["speed"] - 0.75) * 4)
+        if speed_factor != 1.0:
+            print("{!r} using speed_factor {}".format(action_data["letter"], speed_factor))
+            strip.scale = speed_factor
+
+        total_frames = strip.frame_end - strip.frame_start
+
         strip.select = False
         previous_end += total_frames + ACTION_SPACING
         prev_action = new_action

@@ -21,7 +21,7 @@ from pathlib import Path
 csv_path = "AUTOGRAPH TABELA INTENSIDADES - repertorio.csv"
 
 def get_data_from_csv(csv_file):
-    headers = "name speed pressure direction size old_frames letter_notes letter frames selected".split()
+    headers = "name speed pressure direction size old_frames letter_notes letter frames selected speed_factor".split()
 
     raw_data = list(csv.reader(csv_file))
     # Skip spreadsheet header rows:
