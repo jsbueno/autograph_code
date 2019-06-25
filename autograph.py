@@ -242,7 +242,15 @@ def guess_written_phrase_size(strokes, speed):
     elif result == 0:
         result = 1
 
-    print("Assuming written text to be: {!r}".format(phrase[:result]))
+    total_spaces = 0
+    original_glyphs = iter(AUTOGRAPH_PHRASE)
+
+    for letter, glyph in zip(phrase, original_glyphs):
+        while glyph == " ":
+            total_spaces += 1
+            glyph = next(original_glyphs, ".")
+    result += total_spaces
+    print("Assuming written text to be: {!r}".format(AUTOGRAPH_PHRASE[:result]))
     return result
 
 def _format_list(lst):
