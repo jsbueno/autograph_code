@@ -63,10 +63,10 @@ def download_intensity_table(url):
         x = http.client.HTTPSConnection(host, timeout=4)
         x.request("GET", url)
         y = x.getresponse()
-    except OSError as error:
-        print(error, file=sys.stderr)
+    except OSError as err:
+        print(err, file=sys.stderr)
         error = True
-    if y.status != 200 or error:
+    if error or y.status != 200:
         raise RuntimeError("Could not get online data")
     zz = io.TextIOWrapper(y, encoding="utf-8")
     return zz

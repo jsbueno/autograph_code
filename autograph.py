@@ -15,6 +15,15 @@ import flipper
 import parameter_reader
 
 
+bl_info = {
+    "name": "Autograph",
+    "blender": (2, 80, 0),
+    "category": "Autograph",
+    "author": "João S. O. Bueno",
+    "version": (2, 0, 0)
+}
+
+
 AUTOGRAPH_PHRASE = "escrever com o corpo"
 AUTOGRAPH_ORIGINAL_PHRASE = AUTOGRAPH_PHRASE
 
@@ -73,15 +82,6 @@ try:
 except ImportError:
     print("Could not import Pyautogui - some niceties may not work", file=sys.stderr)
     pyautogui = None
-
-
-bl_info = {
-    "name": "Autograph",
-    # "location": "View3D > Tools > Autograph"
-    "category": "Autograph",
-    "author": "João S. O. Bueno",
-    "version": (1, 0, 0)
-}
 
 
 def scene_cleanup(context):
@@ -947,7 +947,7 @@ class AutographPanel(Panel):
     bl_label = "Autograph v.%d.%d.%d" % bl_info['version']
     bl_idname = "AUTOGRAPH_part1"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "TOOLS"
+    bl_region_type = "UI"
     bl_category = "Autograph"
     bl_context = "objectmode"
 
@@ -966,21 +966,25 @@ class AutographPanel(Panel):
         row.prop(scene.autograph_text, "text", text="Texto")
         row = layout.row()
         row.prop(scene.autograph_text, "isolate_actions", text="Isolar ações")
-        #row = layout.row()
-        #row.prop(scene.autograph_text, "lower_speed", text="vel. baixo")
-        #row = layout.row()
-        #row.prop(scene.autograph_text, "upper_speed", text="vel. alto")
 
+
+classes = [RepeatAutograph, AutographTest, Autograph, AutographText, AutographPanel]
 
 
 def register():
+    from bpy.utils import register_class
     print("Registering Autograph add-on")
-    bpy.utils.register_module(__name__)
+    for cls in classes:
+        register_class(cls)
     bpy.types.Scene.autograph_text = bpy.props.PointerProperty(type=AutographText)
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
+    from bpy.utils import unregister_class
+    for cls in classes:
+        unregister_class(cls)
+
+
 
 
 if __name__ == "__main__":
