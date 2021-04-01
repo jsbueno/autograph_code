@@ -92,8 +92,8 @@ def scene_cleanup(context):
     to a fresh text to be drawn.
     """
 
-    for grease in bpy.data.grease_pencil:
-        bpy.data.grease_pencil.remove(grease)
+    for grease in bpy.data.grease_pencils:
+        bpy.data.grease_pencils.remove(grease)
 
     for obj in bpy.data.objects:
         if obj.name.startswith("GP_Layer"):
@@ -267,9 +267,9 @@ def autograph(context):
     global ACTION_DATA
 
     try:
-        strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
+        strokes = bpy.data.grease_pencils[0].layers[0].active_frame.strokes
     except IndexError:
-        print("Can't start: No grease pencil writting found on scene.")
+        print("Can't start: No anottation (old grease pencil) found on scene.")
         return
 
     speed = []; pressure = []; size = []; psize = []
@@ -753,7 +753,7 @@ def autograph_test(context):
 
 
 def fade_text():
-    grease = bpy.data.grease_pencil["GPencil"]
+    grease = bpy.data.grease_pencils[0]
     grease.animation_data_create()
     act = bpy.data.actions.new("GPencil.001Action")
     grease.animation_data.action = act
@@ -839,7 +839,7 @@ class Autograph(Operator):
     def check_writting_started(self, context):
 
         try:
-            gp_layer = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"]
+            gp_layer = bpy.data.grease_pencils[0].layers[0]
         except (KeyError, IndexError, AttributeError):
             return False
         print("Writting started")
@@ -848,11 +848,11 @@ class Autograph(Operator):
         gp_layer.line_change = -1
         gp_layer.tint_color = POST_WRITTING_COLOR
         gp_layer.tint_factor = 1.0
-        grease = bpy.data.grease_pencil["GPencil"]
-        grease.layers["GP_Layer"].line_change = -1
-        grease.layers["GP_Layer"].parent = bpy.data.objects["Camera"]
+        grease = bpy.data.grease_pencils[0]
+        grease.layers[0].line_change = -1
+        grease.layers[0].parent = bpy.data.objects["Camera"]
 
-        grease.palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
+        grease.layers[0].color = WRITTING_COLOR
 
         self.check_write_strokes = 0
         self.check_write_points = 0
@@ -873,7 +873,7 @@ class Autograph(Operator):
 
         """
         try:
-            strokes = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].active_frame.strokes
+            strokes = bpy.data.grease_pencils[0].layers[0].active_frame.strokes
         except (IndexError, KeyError, AttributeError):
             print("No writting - something went wrong")
             return True
