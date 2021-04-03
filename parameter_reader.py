@@ -7,10 +7,11 @@ that can be incorporated in the Autograph scripts
 """
 
 import csv
-import http.client
-import io
-import sys
 
+import io
+
+import sys
+import requests
 from pathlib import Path
 
 
@@ -57,18 +58,18 @@ def write_static_file(data, path="autograph_action_data.py"):
 
 
 def download_intensity_table(url):
-    host = url.split("//")[1].split("/")[0]
     error = False
+
     try:
-        x = http.client.HTTPSConnection(host, timeout=4)
-        x.request("GET", url)
-        y = x.getresponse()
-    except OSError as err:
+        content = requests.get(url, verify=False).text
+
+    except Exception as err:
         print(err, file=sys.stderr)
         error = True
-    if error or y.status != 200:
+    if error:
+        print(f"erro ao baixar planilha: {error}")
         raise RuntimeError("Could not get online data")
-    zz = io.TextIOWrapper(y, encoding="utf-8")
+    zz = io.StringIO(content)
     return zz
 
 

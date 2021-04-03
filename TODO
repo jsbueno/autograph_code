@@ -1,0 +1,73 @@
+#TODO NOVO (upgrade para blender 2.92)
+
+- BUGS:
+
+- Garantir que a dança começa
+    - (as vezes dá erro para montar a track da dança
+       Error: Unable to add strip (the track does not have any space to accommodate this new strip)
+    )
+
+- poder colocar mais de um stroke na escrita (maozinha tá deixando na mão)
+- começar a dança a automaticamente (verificar maozinha)
+
+- Cor da escrita
+- Sumir com a escrita depois que começa a dança
+- no reset, resetar a pose do esqueleto
+
+Features:
+    - criar um docker com o arquivo do autograph, blender mais recente, e scripts , pronto pra funcionar
+
+    - revamp visual
+    - poder mudar a URL da planilha para baixar
+    - arrumar painel
+
+
+
+##
+TODO antigo (do tempo da tese)
+inverter strips (feito)
+
+leitura dinamica do CSV (feito)
+
+verificar erro de copia  de actn ser uma string na linha 560 "action.copy" (feito)
+
+posicionamento da câmera e offset_x inicial para enquadramento da cena (feito)
+esqueleto escondido (feito)
+
+
+esconder a escrita ou mover a escrita (feito)
+
+Altura da letra como size (feito)
+
+
+Frase customizada (feito)
+Usar apenas açoes marcadas (feito)
+
+recalibrar medid do tamanho de letras (feito)
+
+recalibrar medida de velocidade e numero de letras (feito)
+
+
+velocidade do strip (feito)
+
+
+usar velocidade para ajustar intervalos entre letras
+
+levar em conta tamanho das letras para tentar acertar melhor
+number_of_writting_letters
+
+---
+
+Acrescentar destruicao completa do NLA na bomba-atômica
+marretar actions  com arraste no y
+
+usar fator de direcao - direto ou indireto
+
+Fazer transição com o x do pé esquerdo, em vez do x da pelvis
+
+-------------------------
+
+FUTURO:
+
+    usar palavras da frase/stroke e consolidar strokes-palavra medindo espaço x entre os strokes - e usar
+    isso em  "average_value_per_letter".

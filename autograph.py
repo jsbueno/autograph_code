@@ -152,8 +152,10 @@ def cleanup_and_merge_speeds(v):
 def switch_context_area(context, area="NLA_EDITOR"):
     original_area = context.area.type
     context.area.type = area
-    yield
-    context.area.type = original_area
+    try:
+        yield
+    finally:
+        context.area.type = original_area
 
 
 @contextmanager
@@ -666,9 +668,10 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             print("Expected action not found: ",  action_name)
             continue
         new_action = action.copy()
+        previous_end += 10
 
         new_action.name = "temp__{}__{}".format(action_data["letter"], action_name)
-        print("{}: , x_offset: {}".format(new_action.name, x_offset))
+        print(f"action: {new_action.name}, x_offset: {x_offset}, previous_end: {previous_end})")
         x_offset = adjust_next_action(new_action, x_offset, frames, reverse_movement)
 
         convert_action_to_samples(new_action)
@@ -717,9 +720,8 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
 
     previous_strip = None
 
-    context.scene.objects.active = autograph
 
-    _add_transitions(context, track, total_actions)
+    _add_transitions(context, track, total_actions, autograph)
     camera_setup(x_offset)
     # autograph.hide = True
 
@@ -734,14 +736,23 @@ def camera_setup(max_x):
     camera.location[2] = 1
 
 
-def _add_transitions(context, track, total_actions):
-        if total_actions <= 1:
-            return
-        with switch_context_area(context, "NLA_EDITOR"):
-            bpy.ops.nla.selected_objects_add()
-            track.select = True
-            bpy.ops.nla.select_all_toggle(True)
-            bpy.ops.nla.transition_add()
+def _add_transitions(context, track, total_actions, obj):
+    if total_actions <= 1:
+        return
+
+    # This is for blender <= 2.79
+    #context.scene.objects.active = obj
+
+    # This is for blender >= 2.80
+    # (found out at https://blenderartists.org/t/how-to-change-the-active-object-in-2-80/1131298)
+    bpy.context.view_layer.objects.active = obj
+
+    with switch_context_area(context, "NLA_EDITOR"):
+        bpy.ops.nla.selected_objects_add()
+        track.select = True
+        bpy.ops.nla.select_all(action='SELECT')
+        # bpy.ops.nla.select_all_toggle(True)
+        bpy.ops.nla.transition_add()
 
 
 def autograph_test(context):
@@ -753,6 +764,8 @@ def autograph_test(context):
 
 
 def fade_text():
+    return
+    '''
     grease = bpy.data.grease_pencils[0]
     grease.animation_data_create()
     act = bpy.data.actions.new("GPencil.001Action")
@@ -761,7 +774,7 @@ def fade_text():
 
     curve.keyframe_points.insert(1, 1)
     curve.keyframe_points.insert(WRITTING_FADE_FRAME, 0)
-
+    '''
 
 class RepeatAutograph(Operator):
     """Dança Novamente"""
@@ -803,7 +816,7 @@ class Autograph(Operator):
         self.writting_started = False
         self.modal_func = self.check_writting_started
 
-        self._timer = context.window_manager.event_timer_add(0.2, context.window)
+        self._timer = context.window_manager.event_timer_add(0.2, window=context.window)
         context.window_manager.modal_handler_add(self)
 
         self.press_and_hold_grease_pencil_key(START_WRITTING_TIMEOUT)
@@ -816,9 +829,9 @@ class Autograph(Operator):
             print("No autogui")
             return
         def hold_key():
-            pyautogui.keyDown("t")
-            time.sleep(0.05)
-            pyautogui.keyUp("t")
+            #pyautogui.keyDown("t")
+            # time.sleep(0.05)
+            # pyautogui.keyUp("t")
             start_time = time.time()
             print("pressing 'd'")
             pyautogui.keyDown("d")
