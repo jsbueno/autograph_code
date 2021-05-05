@@ -392,7 +392,7 @@ def autograph_ignite(context, phrase_data, number_written_letters):
     total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data, number_written_letters)
     context.scene.frame_start = 1
     context.scene.frame_end = total_frames
-    fade_text()
+    # fade_text()
     bpy.ops.screen.animation_play()
 
 
@@ -843,7 +843,11 @@ class Autograph(Operator):
             except ReferenceError:
                 pass
             finally:
-                pyautogui.keyUp("d")
+                pass
+                # old blender would need just one "d" keypress for multiple strokes.
+                # once annotations started, the "d" mode was always on.
+                # post 3.80, "d" needs to be pressed for each new stroke
+                #pyautogui.keyUp("d")
 
         t = threading.Thread(target=hold_key)
         t.start()
@@ -901,7 +905,9 @@ class Autograph(Operator):
             total_time = time.time() - self.start_writting_time - STOPPED_WRITTING_TIMEOUT
             context.scene.autograph_text.total_writting_time = total_time
             if pyautogui:
-                pyautogui.press("escape")
+                # Pressing esc here was needed prior to Blender 2.80
+                # pyautogui.press("escape")
+                pyautogui.keyUp("d")
                 autograph(context)
 
 
