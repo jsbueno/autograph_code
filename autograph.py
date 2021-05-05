@@ -15,6 +15,15 @@ import flipper
 import parameter_reader
 
 
+bl_info = {
+    "name": "Autograph",
+    "blender": (2, 80, 0),
+    "category": "Autograph",
+    "author": "João S. O. Bueno",
+    "version": (2, 0, 0)
+}
+
+
 AUTOGRAPH_PHRASE = "escrever com o corpo"
 AUTOGRAPH_ORIGINAL_PHRASE = AUTOGRAPH_PHRASE
 
@@ -75,15 +84,6 @@ except ImportError:
     pyautogui = None
 
 
-bl_info = {
-    "name": "Autograph",
-    # "location": "View3D > Tools > Autograph"
-    "category": "Autograph",
-    "author": "João S. O. Bueno",
-    "version": (1, 0, 0)
-}
-
-
 def scene_cleanup(context):
     """AKA: Nuclear Blast
 
@@ -92,8 +92,8 @@ def scene_cleanup(context):
     to a fresh text to be drawn.
     """
 
-    for grease in bpy.data.grease_pencil:
-        bpy.data.grease_pencil.remove(grease)
+    for grease in bpy.data.grease_pencils:
+        bpy.data.grease_pencils.remove(grease)
 
     for obj in bpy.data.objects:
         if obj.name.startswith("GP_Layer"):
@@ -152,8 +152,10 @@ def cleanup_and_merge_speeds(v):
 def switch_context_area(context, area="NLA_EDITOR"):
     original_area = context.area.type
     context.area.type = area
-    yield
-    context.area.type = original_area
+    try:
+        yield
+    finally:
+        context.area.type = original_area
 
 
 @contextmanager
@@ -267,9 +269,9 @@ def autograph(context):
     global ACTION_DATA
 
     try:
-        strokes = bpy.data.grease_pencil[0].layers[0].active_frame.strokes
+        strokes = bpy.data.grease_pencils[0].layers[0].active_frame.strokes
     except IndexError:
-        print("Can't start: No grease pencil writting found on scene.")
+        print("Can't start: No anottation (old grease pencil) found on scene.")
         return
 
     speed = []; pressure = []; size = []; psize = []
@@ -390,7 +392,7 @@ def autograph_ignite(context, phrase_data, number_written_letters):
     total_frames = assemble_actions(context, AUTOGRAPH_PHRASE, phrase_data, number_written_letters)
     context.scene.frame_start = 1
     context.scene.frame_end = total_frames
-    fade_text()
+    # fade_text()
     bpy.ops.screen.animation_play()
 
 
@@ -666,9 +668,10 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
             print("Expected action not found: ",  action_name)
             continue
         new_action = action.copy()
+        previous_end += 10
 
         new_action.name = "temp__{}__{}".format(action_data["letter"], action_name)
-        print("{}: , x_offset: {}".format(new_action.name, x_offset))
+        print(f"action: {new_action.name}, x_offset: {x_offset}, previous_end: {previous_end})")
         x_offset = adjust_next_action(new_action, x_offset, frames, reverse_movement)
 
         convert_action_to_samples(new_action)
@@ -717,9 +720,8 @@ def assemble_actions(context, phrase, phrase_data=None, number_written_letters=l
 
     previous_strip = None
 
-    context.scene.objects.active = autograph
 
-    _add_transitions(context, track, total_actions)
+    _add_transitions(context, track, total_actions, autograph)
     camera_setup(x_offset)
     # autograph.hide = True
 
@@ -734,14 +736,23 @@ def camera_setup(max_x):
     camera.location[2] = 1
 
 
-def _add_transitions(context, track, total_actions):
-        if total_actions <= 1:
-            return
-        with switch_context_area(context, "NLA_EDITOR"):
-            bpy.ops.nla.selected_objects_add()
-            track.select = True
-            bpy.ops.nla.select_all_toggle(True)
-            bpy.ops.nla.transition_add()
+def _add_transitions(context, track, total_actions, obj):
+    if total_actions <= 1:
+        return
+
+    # This is for blender <= 2.79
+    #context.scene.objects.active = obj
+
+    # This is for blender >= 2.80
+    # (found out at https://blenderartists.org/t/how-to-change-the-active-object-in-2-80/1131298)
+    bpy.context.view_layer.objects.active = obj
+
+    with switch_context_area(context, "NLA_EDITOR"):
+        bpy.ops.nla.selected_objects_add()
+        track.select = True
+        bpy.ops.nla.select_all(action='SELECT')
+        # bpy.ops.nla.select_all_toggle(True)
+        bpy.ops.nla.transition_add()
 
 
 def autograph_test(context):
@@ -753,7 +764,9 @@ def autograph_test(context):
 
 
 def fade_text():
-    grease = bpy.data.grease_pencil["GPencil"]
+    return
+    '''
+    grease = bpy.data.grease_pencils[0]
     grease.animation_data_create()
     act = bpy.data.actions.new("GPencil.001Action")
     grease.animation_data.action = act
@@ -761,7 +774,7 @@ def fade_text():
 
     curve.keyframe_points.insert(1, 1)
     curve.keyframe_points.insert(WRITTING_FADE_FRAME, 0)
-
+    '''
 
 class RepeatAutograph(Operator):
     """Dança Novamente"""
@@ -803,7 +816,7 @@ class Autograph(Operator):
         self.writting_started = False
         self.modal_func = self.check_writting_started
 
-        self._timer = context.window_manager.event_timer_add(0.2, context.window)
+        self._timer = context.window_manager.event_timer_add(0.2, window=context.window)
         context.window_manager.modal_handler_add(self)
 
         self.press_and_hold_grease_pencil_key(START_WRITTING_TIMEOUT)
@@ -816,9 +829,9 @@ class Autograph(Operator):
             print("No autogui")
             return
         def hold_key():
-            pyautogui.keyDown("t")
-            time.sleep(0.05)
-            pyautogui.keyUp("t")
+            #pyautogui.keyDown("t")
+            # time.sleep(0.05)
+            # pyautogui.keyUp("t")
             start_time = time.time()
             print("pressing 'd'")
             pyautogui.keyDown("d")
@@ -830,7 +843,11 @@ class Autograph(Operator):
             except ReferenceError:
                 pass
             finally:
-                pyautogui.keyUp("d")
+                pass
+                # old blender would need just one "d" keypress for multiple strokes.
+                # once annotations started, the "d" mode was always on.
+                # post 3.80, "d" needs to be pressed for each new stroke
+                #pyautogui.keyUp("d")
 
         t = threading.Thread(target=hold_key)
         t.start()
@@ -839,7 +856,7 @@ class Autograph(Operator):
     def check_writting_started(self, context):
 
         try:
-            gp_layer = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"]
+            gp_layer = bpy.data.grease_pencils[0].layers[0]
         except (KeyError, IndexError, AttributeError):
             return False
         print("Writting started")
@@ -848,11 +865,11 @@ class Autograph(Operator):
         gp_layer.line_change = -1
         gp_layer.tint_color = POST_WRITTING_COLOR
         gp_layer.tint_factor = 1.0
-        grease = bpy.data.grease_pencil["GPencil"]
-        grease.layers["GP_Layer"].line_change = -1
-        grease.layers["GP_Layer"].parent = bpy.data.objects["Camera"]
+        grease = bpy.data.grease_pencils[0]
+        grease.layers[0].line_change = -1
+        grease.layers[0].parent = bpy.data.objects["Camera"]
 
-        grease.palettes["GP_Palette"].colors["Color"].color = WRITTING_COLOR
+        grease.layers[0].color = WRITTING_COLOR
 
         self.check_write_strokes = 0
         self.check_write_points = 0
@@ -873,7 +890,7 @@ class Autograph(Operator):
 
         """
         try:
-            strokes = bpy.data.grease_pencil["GPencil"].layers["GP_Layer"].active_frame.strokes
+            strokes = bpy.data.grease_pencils[0].layers[0].active_frame.strokes
         except (IndexError, KeyError, AttributeError):
             print("No writting - something went wrong")
             return True
@@ -888,7 +905,9 @@ class Autograph(Operator):
             total_time = time.time() - self.start_writting_time - STOPPED_WRITTING_TIMEOUT
             context.scene.autograph_text.total_writting_time = total_time
             if pyautogui:
-                pyautogui.press("escape")
+                # Pressing esc here was needed prior to Blender 2.80
+                # pyautogui.press("escape")
+                pyautogui.keyUp("d")
                 autograph(context)
 
 
@@ -947,7 +966,7 @@ class AutographPanel(Panel):
     bl_label = "Autograph v.%d.%d.%d" % bl_info['version']
     bl_idname = "AUTOGRAPH_part1"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "TOOLS"
+    bl_region_type = "UI"
     bl_category = "Autograph"
     bl_context = "objectmode"
 
@@ -966,21 +985,25 @@ class AutographPanel(Panel):
         row.prop(scene.autograph_text, "text", text="Texto")
         row = layout.row()
         row.prop(scene.autograph_text, "isolate_actions", text="Isolar ações")
-        #row = layout.row()
-        #row.prop(scene.autograph_text, "lower_speed", text="vel. baixo")
-        #row = layout.row()
-        #row.prop(scene.autograph_text, "upper_speed", text="vel. alto")
 
+
+classes = [RepeatAutograph, AutographTest, Autograph, AutographText, AutographPanel]
 
 
 def register():
+    from bpy.utils import register_class
     print("Registering Autograph add-on")
-    bpy.utils.register_module(__name__)
+    for cls in classes:
+        register_class(cls)
     bpy.types.Scene.autograph_text = bpy.props.PointerProperty(type=AutographText)
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
+    from bpy.utils import unregister_class
+    for cls in classes:
+        unregister_class(cls)
+
+
 
 
 if __name__ == "__main__":
